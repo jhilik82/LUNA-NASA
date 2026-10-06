@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "classification": "Authored junior-astronaut learning campaign. Hardware capacities, power budgets, failures and shelter alerts are fictional teaching scenarios. Elevation, coordinates, slopes and dated celestial vectors retain NASA/JPL provenance.",
+  "levels": [
+    {
+      "id": "eva",
+      "title": "Your first moonwalk",
+      "skill": "EVA navigation & observation",
+      "brief": "Learn to move, identify yourself and your destination, record a real terrain observation, and return to Haven.",
+      "steps": [
+        "Walk 40 m toward the cyan training beacon",
+        "Press Q at the beacon to measure the terrain",
+        "Return to Haven and press E"
+      ],
+      "badge": "EVA Ready",
+      "rank": "EVA Cadet",
+      "question": "What makes the white Lifeline route useful before a detour?",
+      "answers": [
+        "It estimates whether my current supplies support a return",
+        "It makes the suit's oxygen unlimited",
+        "It marks the fastest path to every planet"
+      ],
+      "correct": 0,
+      "explanation": "The Lifeline calculates a terrain route and compares its oxygen, water and energy cost with your remaining supplies. A longer detour changes that calculation."
+    },
+    {
+      "id": "systems",
+      "title": "Keep Haven alive",
+      "skill": "Electrical repair & resource balance",
+      "brief": "Restore the outpost power bus, then allocate available power to life support, food production and communications. Every system has a minimum demand.",
+      "steps": [
+        "Press E at Haven and reconnect its power circuit",
+        "Allocate power to cover all three system demands",
+        "Leave a reserve within the available supply"
+      ],
+      "badge": "Systems Engineer",
+      "rank": "Outpost Technician",
+      "question": "What happens if total allocated power exceeds the supply?",
+      "answers": [
+        "All systems automatically receive extra energy",
+        "The allocation cannot be supported; reduce or reprioritise loads",
+        "Only the displayed numbers change"
+      ],
+      "correct": 1,
+      "explanation": "The outpost has a finite power supply. Allocations above that limit are rejected. Meeting life-support demand and leaving a reserve keeps the teaching model stable."
+    },
+    {
+      "id": "recovery",
+      "title": "Bring Echo home",
+      "skill": "Terrain routing, repair & rover operation",
+      "brief": "Use your field skills on a full recovery expedition. Restore the relay, repair Echo, board it and drive it home while protecting your return reserves.",
+      "steps": [
+        "Reach the relay and repair its circuit",
+        "Reach Echo and repair its power bus",
+        "Board Echo, drive to Haven and press E to dock"
+      ],
+      "badge": "Rover Specialist",
+      "rank": "Mission Specialist",
+      "question": "Why can a walking shortcut be unavailable to Echo?",
+      "answers": [
+        "Rover routes ignore terrain elevations",
+        "The rover uses a stricter slope limit than the suit",
+        "The Sun blocks every rover path"
+      ],
+      "correct": 1,
+      "explanation": "Both paths are derived from the NASA elevation grid. The fictional rover is configured for a lower maximum slope, so its route can differ from an EVA route."
+    },
+    {
+      "id": "science",
+      "title": "Read the Moon and sky",
+      "skill": "Observation, coordinates & ephemerides",
+      "brief": "Visit two survey sites, inspect Earth and LRO in the orbital tracker, and bring your findings back. Learn the difference between your surface position and dated spacecraft positions.",
+      "steps": [
+        "Scan the two marked survey sites with Q",
+        "Inspect Earth and LRO in the orbital tracker",
+        "Return to Haven and press E"
+      ],
+      "badge": "Science Navigator",
+      "rank": "Science Specialist",
+      "question": "Are the orbital positions live signals from the spacecraft?",
+      "answers": [
+        "Yes, they are live telemetry from the suit",
+        "No, they are interpolated dated JPL ephemerides",
+        "They are random positions drawn for each game"
+      ],
+      "correct": 1,
+      "explanation": "The orbital tracker uses cached NASA/JPL samples at the mission clock. The surface tracker reads your character's game state in a separate lunar body-fixed frame."
+    },
+    {
+      "id": "shelter",
+      "title": "Protect the crew",
+      "skill": "Shelter response & emergency priorities",
+      "brief": "Complete a clearly labelled training alert: return from the field, enter Haven, seal the shelter and keep essential systems powered under a reduced supply. No real radiation dose is modelled.",
+      "steps": [
+        "Return from the field to Haven",
+        "Press E to operate the shelter systems",
+        "Seal the shelter and balance emergency power"
+      ],
+      "badge": "Crew Guardian",
+      "rank": "Response Specialist",
+      "question": "What is the sensible response to this shelter training alert?",
+      "answers": [
+        "Stay outside and keep collecting optional observations",
+        "Return to shelter and prioritise life support within the power budget",
+        "Turn every system to its maximum allocation"
+      ],
+      "correct": 1,
+      "explanation": "The drill rewards reaching shelter, sealing it and supplying essential loads within a finite budget. It teaches decision priorities; it is an authored scenario, not a lunar radiation forecast."
+    },
+    {
+      "id": "solar",
+      "title": "Harvest the sunlight",
+      "skill": "Solar-array calibration",
+      "brief": "Visit the outpost array, use its live 3D controls to aim both axes, and commission a useful power source.",
+      "steps": [
+        "Inspect the array at Haven",
+        "Align tilt and bearing with the training target",
+        "Connect the array when its alignment is correct"
+      ],
+      "badge": "Solar Operator",
+      "rank": "Power Specialist",
+      "question": "Why does the modeled output change as the array turns?",
+      "answers": [
+        "Orientation affects the teaching model's collected power",
+        "Every angle always produces maximum power",
+        "The panel creates energy without a source"
+      ],
+      "correct": 0,
+      "explanation": "The visible array orientation feeds the modeled power calculation. The angles and light direction are authored teaching targets, not observed lunar illumination."
+    },
+    {
+      "id": "airlock",
+      "title": "Prepare for an EVA",
+      "skill": "Airlock sequencing & suit checks",
+      "brief": "Operate a visible airlock: check your suit, seal the inner hatch, vent the chamber, then open the outer hatch. Incorrect action order is rejected.",
+      "steps": [
+        "Check suit reserves at the airlock",
+        "Seal the inner hatch and vent the chamber",
+        "Open the outer hatch after pressure is reduced"
+      ],
+      "badge": "EVA Operator",
+      "rank": "EVA Specialist",
+      "question": "What must happen before opening the outer hatch?",
+      "answers": [
+        "Open both hatches together",
+        "Seal the inner hatch and depressurise the chamber",
+        "Ignore the suit check"
+      ],
+      "correct": 1,
+      "explanation": "The procedure isolates the outpost before venting the teaching-model chamber. Hatch motion and pressure indicators show the sequence; this is not a certified EVA procedure."
+    },
+    {
+      "id": "samples",
+      "title": "Bring back a lunar sample",
+      "skill": "Field collection & sample handling",
+      "brief": "Walk to the marked sample, collect it, bring it to Haven, attach its measured site record, seal the canister and stow it in the laboratory.",
+      "steps": [
+        "Reach the field sample and press E to collect it",
+        "Return the sample to the laboratory at Haven",
+        "Attach its site record, seal it and stow it"
+      ],
+      "badge": "Sample Curator",
+      "rank": "Research Specialist",
+      "question": "Why keep a site record with the sample?",
+      "answers": [
+        "It preserves where the observation was collected",
+        "It increases oxygen without a refill",
+        "It makes every lunar rock identical"
+      ],
+      "correct": 0,
+      "explanation": "The specimen is fictional, but its collection coordinates and elevation come from the NASA terrain grid. Its label keeps that observation attached to the stored sample."
+    },
+    {
+      "id": "comms",
+      "title": "Restore the ground link",
+      "skill": "Antenna pointing & signal acquisition",
+      "brief": "Travel to the relay and aim its physical dish at an authored training beacon. Inspect it from any side while adjusting bearing and elevation.",
+      "steps": [
+        "Reach the relay station",
+        "Align the dish bearing and elevation",
+        "Establish the training link"
+      ],
+      "badge": "Signal Engineer",
+      "rank": "Communications Specialist",
+      "question": "What are the antenna controls changing?",
+      "answers": [
+        "The real orbit of the Moon",
+        "The physical dish orientation and modeled alignment quality",
+        "The total number of NASA satellites"
+      ],
+      "correct": 1,
+      "explanation": "The 3D dish follows your inputs and the game evaluates alignment against a fictional ground-beacon target. It does not calculate a real lunar radio link."
+    },
+    {
+      "id": "logistics",
+      "title": "Complete the supply run",
+      "skill": "Cargo loading, delivery & rover return",
+      "brief": "Secure a visible supply crate onto Echo, board it, deliver the crate to the field station, then return to Haven. Complete this practical run to graduate.",
+      "steps": [
+        "Load the supply crate at Haven and board Echo",
+        "Drive to the field station and press E to unload",
+        "Return Echo to Haven and press E to dock"
+      ],
+      "badge": "Logistics Lead",
+      "rank": "Qualified Junior Astronaut",
+      "question": "What makes a supply run complete?",
+      "answers": [
+        "Driving away without a loaded crate",
+        "Delivering the cargo and bringing the rover safely home",
+        "Leaving the rover at an unmarked point"
+      ],
+      "correct": 1,
+      "explanation": "The task records loading, transport, delivery and docking as separate actions. The actual 3D crate changes position as it moves from the outpost to the rover and field station."
+    }
+  ],
+  "power": {
+    "normalSupplyKw": 12,
+    "emergencySupplyKw": 8,
+    "lifeSupportMinimumKw": 4,
+    "greenhouseNormalMinimumKw": 3,
+    "greenhouseEmergencyMinimumKw": 2,
+    "communicationsNormalMinimumKw": 2,
+    "communicationsEmergencyMinimumKw": 1,
+    "reserveMinimumKw": 1
+  },
+  "rewards": {
+    "stageCompletionXp": 300,
+    "correctReviewXp": 100
+  }
+}

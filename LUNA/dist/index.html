@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#132127">
+  <meta name="description" content="Train as a junior astronaut in ten 3D lunar missions. Practise EVA, repair, power, sample handling, antenna pointing and rover deliveries with ASTRA guidance.">
+  <title>LUNA — Beyond the Lifeline</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23132127'/%3E%3Cpath d='M42 12a22 22 0 1 0 10 36A23 23 0 0 1 42 12' fill='%23f3e8cc'/%3E%3Ccircle cx='46' cy='18' r='4' fill='%23ff915d'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css?v=0.9.0">
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="#" aria-label="LUNA home" id="brand-home">
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="M28 5A16 16 0 1 0 35 30 18 18 0 0 1 28 5" fill="currentColor"/><circle cx="31" cy="10" r="3" fill="#ff915d"/></svg>
+      <span class="brand-word">LUNA<span class="brand-caption">BEYOND THE LIFELINE</span></span>
+    </a>
+    <div class="header-center"><span class="status-dot"></span> JUNIOR ASTRONAUT ACADEMY</div>
+    <nav class="header-actions" aria-label="Game tools">
+      <button class="text-button settings-button" id="settings-button" aria-haspopup="dialog"><span aria-hidden="true">⚙</span> Settings</button>
+      <button class="text-button" id="data-button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 2 6l8 4 8-4-8-4ZM2 10l8 4 8-4M2 14l8 4 8-4"/></svg><span>Data & science</span></button>
+      <button class="icon-button" id="sound-button" title="Mute soundtrack" aria-label="Mute soundtrack" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-4v12l-4-4H3V8Zm10-2c4 2 4 6 0 8"/></svg></button>
+      <button class="icon-button" id="help-button" title="How to play" aria-label="How to play"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M8 7a2 2 0 0 1 4 0c0 2-2 2-2 4m0 2v1"/></svg></button>
+      <a class="download-button" href="luna-playable.html" download="LUNA-Playable-Prototype.html" id="download-button">Download game <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main class="workspace">
+    <section class="playfield" aria-label="Lunar game world">
+      <canvas id="world" tabindex="0" aria-label="Lunar surface. Drag to look around, Shift-drag to pan, F for astronaut view, WASD or arrow keys to move. Click or tap without dragging to plot a route."></canvas>
+      <div class="cinema-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="event-banner" id="event-banner" role="status" hidden><span id="event-kicker">EXPEDITION 01</span><strong id="event-title">THE MOON IS CALLING</strong><span id="event-caption">Restore the signal. Bring Echo home.</span></div>
+      <div class="world-header">
+        <div class="world-heading"><div class="eyebrow" id="world-kicker">JUNIOR ASTRONAUT / LEVEL 1 OF 10</div><h1 id="world-title">Your first moonwalk</h1><p id="world-subtitle">Learn with ASTRA. Earn your first skill badge.</p></div>
+        <div class="map-tabs" role="group" aria-label="World view"><button class="active" id="surface-tab" aria-pressed="true">Play · Surface</button><button id="orbit-tab" aria-pressed="false">Orbital data</button></div>
+      </div>
+      <div class="world-tools" aria-label="Map tools">
+        <button class="map-button" id="camera-button" title="Rotate 3D camera. Drag the surface to look around." aria-label="Rotate 3D camera">↻</button>
+        <button class="map-button" id="zoom-in" aria-label="Zoom in">+</button>
+        <button class="map-button" id="zoom-out" aria-label="Zoom out">−</button>
+        <button class="map-button" id="follow-button" title="Follow astronaut" aria-label="Follow astronaut" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1v5m0 8v5M1 10h5m8 0h5"/></svg></button>
+        <button class="map-button" id="elevation-button" title="Show measured elevation" aria-label="Show measured elevation" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m2 15 5-10 3 6 3-8 5 12H2Z"/></svg></button>
+      </div>
+      <div class="sector-tag"><span class="status-dot"></span><span id="sector-label">NASA LOLA / SOUTH POLAR SECTOR</span></div>
+      <section class="camera-controls" id="camera-controls" aria-label="360 degree camera controls">
+        <span id="camera-readout">360° ORBIT VIEW</span><div><button id="orbit-left" aria-label="Turn camera left">↶</button><button id="orbit-right" aria-label="Turn camera right">↷</button><button id="tilt-up" aria-label="Raise camera angle">↑</button><button id="tilt-down" aria-label="Lower camera angle">↓</button></div>
+        <button id="first-person-button" aria-pressed="false">Astronaut view · F</button>
+        <div class="camera-actions"><button id="camera-mode-button" aria-pressed="false">Pan terrain</button><button id="camera-overview">Overview</button></div>
+        <button id="inspect-objective">Show objective</button><button id="camera-home">Follow astronaut ↺</button><small id="camera-hint">Drag to look · Shift-drag to pan</small>
+      </section>
+      <div class="camera-aim" id="camera-aim" aria-hidden="true" hidden><span></span></div>
+      <section class="training-workbench" id="training-workbench" aria-labelledby="workbench-title" hidden>
+        <div class="workbench-heading"><span>ASTRA · PRACTICAL TRAINING</span><button id="workbench-close" aria-label="Close equipment controls and return to movement">×</button></div>
+        <h2 id="workbench-title"></h2><p id="workbench-text"></p><strong id="workbench-readout" role="status"></strong><div id="workbench-ranges"></div>
+        <button class="primary-button" id="workbench-next" hidden>Continue to next level →</button><button class="primary-button" id="workbench-action">Perform action →</button><button class="secondary-button" id="workbench-demo">Watch instructor demonstration</button><small id="demo-status" role="status"></small><small>Drag the scene to look around. Movement and reserves pause while you practise.</small>
+      </section>
+      <div class="world-wayfinding" id="world-wayfinding" aria-hidden="true"><span class="world-tag you-tag" id="you-tag">YOU</span><span class="world-tag goal-tag" id="goal-tag">OBJECTIVE</span></div>
+      <div class="orbital-tools" id="orbital-tools" hidden><strong>Observe the sky · surface tasks stay on the Moon</strong><div><button class="secondary-button" id="inspect-earth">Inspect Earth</button><button class="secondary-button" id="inspect-lro">Inspect LRO</button><button class="primary-button" id="return-surface">Return to play →</button></div><p id="orbital-readout">Select a body to see its dated distance and coverage.</p></div>
+
+      <div class="briefing-card" id="briefing-card">
+        <div class="eyebrow" id="briefing-kicker">LEVEL 1 / EVA BASICS</div>
+        <h2 id="briefing-title">Your first moonwalk</h2>
+        <p id="briefing-description">Walk to the training beacon, record a terrain observation, then return to Haven.</p>
+        <div class="briefing-tags"><span>REAL LUNAR TERRAIN</span><span id="briefing-skill">EVA NAVIGATION & OBSERVATION</span></div>
+        <button class="primary-button" id="start-button">Start training →</button>
+        <div class="briefing-foot"><span class="small-orbit" aria-hidden="true">✦</span> Follow the Next action card. WASD moves; E interacts; Q scans.</div>
+        <div class="music-credit"><span class="equalizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span> Original adaptive soundtrack · starts with play</div>
+      </div>
+
+      <div class="location-card" id="location-card">
+        <div class="location-top"><span class="status-dot"></span><span id="actor-mode">ASTRONAUT / EVA</span><span class="location-id">A-01</span></div>
+        <div class="coordinates"><span id="latitude">—</span><span class="coord-divider">/</span><span id="longitude">—</span></div>
+        <div class="location-bottom"><span id="elevation">— m</span><span id="distance-travelled">0.00 km travelled</span></div>
+      </div>
+      <div class="interaction-prompt" id="interaction-prompt" hidden><button id="interact-button"><kbd>E</kbd><span id="interact-label">Interact</span><span aria-hidden="true">↗</span></button></div>
+      <div class="mission-notice" id="notice" role="status" hidden></div>
+      <div class="paused-banner" id="paused-banner" hidden><span>EXPEDITION PAUSED</span><button id="resume-button">Resume <span aria-hidden="true">→</span></button></div>
+      <div class="world-loading" id="loading"><span class="loading-orbit"></span><p>Preparing your expedition…</p><small>Loading the lunar terrain and mission data.</small></div>
+      <div class="touch-controls" id="touch-controls" aria-label="Touch movement controls">
+        <div class="d-pad"><button data-direction="up" aria-label="Move up">↑</button><button data-direction="left" aria-label="Move left">←</button><button data-direction="down" aria-label="Move down">↓</button><button data-direction="right" aria-label="Move right">→</button></div>
+        <button class="touch-action" id="touch-interact">E <span>ACT</span></button>
+      </div>
+      <div class="world-footer"><span><span class="footer-cross">+</span> TERRAIN: NASA LRO / LOLA</span><span id="render-mode">3D terrain · NASA elevation · artistic lighting</span></div>
+      <section class="tutorial-card floating-panel" id="tutorial-card" data-floating-panel aria-label="Guided expedition" hidden>
+        <div class="tutorial-top panel-handle-row"><button class="panel-drag-handle tutorial-drag-handle" id="tutorial-drag-handle" aria-label="Move tutorial. Drag, or use arrow keys. Home resets its position." title="Drag to move · arrow keys also work"><span class="tutorial-avatar" aria-hidden="true">✦</span><span>ASTRA FLIGHT SCHOOL</span><span class="drag-grip" aria-hidden="true">⠿</span></button><button class="panel-reset" id="tutorial-position-reset" aria-label="Reset tutorial position" title="Reset position">↺</button><button id="tutorial-skip" aria-label="Turn tutorial off">Hide ×</button></div>
+        <div class="tutorial-progress" id="tutorial-progress" aria-hidden="true"></div>
+        <div class="tutorial-step" id="tutorial-step">LEVEL 1 / WELCOME</div>
+        <h2 id="tutorial-title">Your first lunar expedition</h2>
+        <p id="tutorial-text" aria-live="polite"></p>
+        <div class="tutorial-clock" id="tutorial-clock">LEARN BY DOING</div>
+        <button class="primary-button" id="tutorial-action">Continue <span aria-hidden="true">→</span></button>
+      </section>
+    </section>
+
+    <aside class="mission-panel" aria-label="Mission and astronaut information">
+      <section class="academy-card"><div class="panel-title"><span>YOUR TRAINING</span><button id="levels-button">All levels ↗</button></div><strong id="cadet-rank">Junior Cadet</strong><div class="academy-progress"><span id="academy-summary">0 / 10 badges · 0 XP</span><button id="tutorial-toggle" aria-pressed="true">Tutorial on</button></div><div class="academy-badges" id="academy-badges" aria-label="Earned skill badges"></div></section>
+      <section class="next-action-card" id="next-action-card" aria-label="Next action"><div class="panel-title">NEXT ACTION</div><h2 id="next-action-title">Start your lesson</h2><p id="next-action-text">ASTRA will guide you through your first moonwalk.</p><button class="primary-button" id="next-action-button">Start level 1 →</button></section>
+      <section class="objective-card">
+        <div class="panel-title"><span>LEVEL OBJECTIVES</span><span class="mission-number">01 / 10</span></div>
+        <div class="mission-title-row"><h2 id="mission-title">Your first moonwalk</h2><span class="mission-pill" id="mission-status">READY</span></div>
+        <p class="learning-goal" id="learning-goal">Learn: EVA navigation and observation.</p>
+        <ol class="objectives" id="objectives"></ol>
+        <button class="route-button" id="route-button">Go to objective <span aria-hidden="true">↗</span></button>
+      </section>
+      <section class="telemetry-card" id="telemetry-card">
+        <div class="panel-title"><span>YOUR RESERVES</span><span class="subtle" id="equipment-label">EVA SUIT</span></div>
+        <div class="resource"><div><span>Oxygen</span><strong id="oxygen-value">—</strong></div><div class="resource-bar" role="progressbar" aria-label="Oxygen reserve" aria-valuemin="0" aria-valuemax="100"><span id="oxygen-bar"></span></div><small id="oxygen-detail">Nominal minutes remaining</small></div>
+        <div class="resource"><div><span id="battery-title">Suit energy</span><strong id="battery-value">—</strong></div><div class="resource-bar energy" role="progressbar" aria-label="Battery reserve" aria-valuemin="0" aria-valuemax="100"><span id="battery-bar"></span></div><small id="battery-detail">— Wh available</small></div>
+        <div class="water-row"><span class="water-drop" aria-hidden="true">◈</span><span>Water <strong id="water-value">—</strong></span><span>Research <strong id="science-value">0 / 3</strong></span></div>
+      </section>
+      <section class="lifeline-card" id="lifeline-card">
+        <div class="lifeline-top"><svg viewBox="0 0 28 20" aria-hidden="true"><path d="M1 11h5l3-7 5 13 4-9 3 3h6"/></svg><h2>The Lifeline</h2><span class="lifeline-status" id="lifeline-status">WITHIN RESERVE</span></div>
+        <p id="lifeline-detail">Your return route updates as you explore.</p>
+        <button id="lifeline-button" aria-pressed="true">Return ribbon visible <span aria-hidden="true">↗</span></button>
+      </section>
+      <section class="tracker-card">
+        <div class="panel-title"><span>SURFACE TRACKER</span><span class="subtle" id="tracker-status">POSITION VERIFIED</span></div>
+        <canvas id="minimap" width="260" height="112" tabindex="0" aria-label="Surface tracking map. Click a destination to navigate or press Enter to plot a route to the objective."></canvas>
+        <div class="tracker-legend"><span><i class="legend-white"></i>You</span><span><i class="legend-orange"></i>Mission</span><span><i class="legend-cyan"></i>Research</span></div>
+      </section>
+    </aside>
+  </main>
+  <button class="astra-launcher" id="astra-button" aria-controls="astra-card" aria-expanded="false" aria-haspopup="dialog" disabled><span class="astra-launcher-symbol" aria-hidden="true">✦</span><span>ASTRA<small>Your mission companion</small></span><span class="launcher-chevron" aria-hidden="true">↗</span></button>
+  <section class="astra-popup floating-panel" id="astra-card" data-floating-panel role="dialog" aria-modal="false" aria-labelledby="astra-title" hidden>
+    <div class="astra-header panel-handle-row"><button class="panel-drag-handle astra-drag-handle" id="astra-drag-handle" aria-label="Move ASTRA. Drag, or use arrow keys. Home resets its position." title="Drag to move · arrow keys also work"><span class="astra-symbol" aria-hidden="true">✦</span><span class="astra-identity"><strong id="astra-title">ASTRA</strong><small>DRAG TO MOVE</small></span><span class="drag-grip" aria-hidden="true">⠿</span></button><button class="panel-reset" id="astra-position-reset" aria-label="Reset ASTRA position" title="Reset position">↺</button><button class="astra-close" id="astra-close" aria-label="Close ASTRA" title="Close ASTRA">×</button></div>
+    <div class="astra-content">
+      <div class="astra-answer-label"><span class="status-dot"></span> YOUR CURRENT MISSION</div>
+      <div class="astra-message" id="astra-message" role="log" aria-live="polite">Ready when you are, astronaut. Let’s bring Echo home.</div>
+      <div class="astra-prompts" aria-label="Quick questions"><button data-question="What should I do next?">Next move <span aria-hidden="true">↗</span></button><button data-question="Is my return reserve safe?">Can I return?</button><button data-question="Where are the satellites and planets?">Orbit</button><button data-question="Plot route to objective">Route to objective</button><button data-question="Route to Haven">Route home</button></div>
+      <div class="astra-route-card" id="astra-route-card" hidden><span class="astra-route-kicker">TERRAIN-AWARE ROUTE</span><strong id="astra-route-destination">Destination</strong><div class="astra-route-metrics"><span id="astra-route-distance">— km</span><span id="astra-route-time">— min</span></div><small id="astra-route-status">PREVIEW</small><div class="astra-route-actions"><button id="astra-follow-route">Follow route →</button><button id="astra-clear-route">Clear</button></div></div>
+      <button class="astra-map-pick" id="astra-pick-point">Choose a point on the map <span aria-hidden="true">⌖</span></button>
+      <form id="astra-form"><label class="sr-only" for="astra-input">Ask ASTRA about the mission</label><input id="astra-input" placeholder="Ask about your expedition…" maxlength="240" autocomplete="off"><button type="submit" aria-label="Ask ASTRA">↑</button></form>
+      <p class="astra-footnote">Try “route to Echo” or “north 200 m”. Compass directions are lunar; left/right/up/down follow the screen. Esc closes ASTRA.</p>
+    </div>
+  </section>
+  <footer class="command-bar">
+    <div class="keyboard-legend"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> MOVE</span><span><kbd>E</kbd> INTERACT</span><span><kbd>SHIFT</kbd> SPRINT</span><span><kbd>Q</kbd> SURVEY</span><span><kbd>M</kbd> MAP</span></div>
+    <div class="clock"><span class="clock-label">MISSION CLOCK</span><strong id="clock">12:00:00</strong><span class="time-scale">TDB · 10×</span><button class="icon-button" id="pause-button" aria-label="Pause expedition" title="Pause expedition"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12m6-12v12"/></svg></button></div>
+  </footer>
+
+  <dialog id="repair-dialog" class="repair-dialog">
+    <div class="repair-workbench">
+    <div class="dialog-heading"><div class="eyebrow">FIELD ENGINEERING</div><button class="dialog-close" data-close aria-label="Close repair puzzle">×</button></div>
+    <h2 id="repair-title">Reconnect the power bus<span>.</span></h2><p class="dialog-description" id="repair-description">Rotate neighbouring tiles to connect the labelled INPUT to OUTPUT.</p>
+    <div class="circuit-design" id="circuit-design"></div>
+    <div class="circuit-frame" id="circuit-frame"><div class="circuit-input" id="circuit-input"><span class="circuit-indicator"></span><span>INPUT</span></div><div class="circuit-grid" id="circuit-grid" aria-label="Rotatable circuit tiles"></div><div class="circuit-output" id="circuit-output"><span class="circuit-indicator" id="output-indicator"></span><span>OUTPUT</span></div></div>
+    <div class="repair-feedback"><span id="circuit-feedback">Signal not connected</span><span id="circuit-moves">0 rotations</span></div>
+    <div class="repair-hint"><kbd>↻</kbd> Click a tile to rotate it 90°. Mission time is paused.</div>
+    <button class="primary-button" id="apply-repair" disabled>Apply repair <span aria-hidden="true">→</span></button>
+    </div>
+  </dialog>
+
+  <dialog id="story-dialog" class="story-dialog" aria-labelledby="story-title">
+    <div class="story-vignette" aria-hidden="true"></div>
+    <div class="story-cut" id="story-cut" aria-hidden="true"></div>
+    <div class="story-topbar"><a class="story-brand" aria-label="LUNA">LUNA<span>BEYOND THE LIFELINE</span></a><div class="story-actions"><button class="secondary-button" id="story-sound">Enable music</button><button class="secondary-button" id="story-skip">Skip story →</button></div></div>
+    <div class="story-caption-card" id="story-caption-card" role="status"><div class="eyebrow" id="story-chapter">CHAPTER 01 / A NEW FRONTIER</div><h2 id="story-title">Somewhere beyond home.</h2><div class="story-dialogue"><span id="story-speaker">MISSION CONTROL</span><p id="story-caption">Your expedition is about to begin.</p></div></div>
+    <div class="story-letterbox top" aria-hidden="true"></div><div class="story-letterbox bottom" aria-hidden="true"></div>
+  </dialog>
+
+  <dialog id="debrief-dialog" class="debrief-dialog">
+    <div class="dialog-heading"><div class="eyebrow">EXPEDITION DEBRIEF</div><button class="dialog-close" data-close aria-label="Close debrief">×</button></div>
+    <div class="debrief-emblem" id="debrief-emblem" aria-hidden="true">✦</div><h2 id="debrief-title">Echo is home<span>.</span></h2><p id="debrief-description">You restored the signal and returned the rover to Haven.</p>
+    <div class="debrief-rank" id="debrief-rank">MISSION SPECIALIST</div>
+    <div class="debrief-metrics" id="debrief-metrics"></div><div class="debrief-learning" id="debrief-learning"></div>
+    <div class="dialog-actions"><button class="primary-button" id="next-level-button" hidden>Continue to next level →</button><button class="secondary-button" id="replay-button">Retry level ↻</button><button class="secondary-button" id="restart-button">Restart level</button></div>
+    <div class="skill-check" id="skill-check" hidden><div class="eyebrow">OPTIONAL KNOWLEDGE CHECK · +100 XP</div><h3 id="review-question"></h3><div id="review-answers"></div><p id="review-feedback" role="status"></p></div>
+    <div class="course-certificate" id="course-certificate" hidden></div>
+    <div class="debrief-journal" id="debrief-journal"></div>
+  </dialog>
+
+  <dialog id="data-dialog" class="data-dialog">
+    <div class="dialog-heading"><div class="eyebrow">THE SCIENCE BEHIND THE ADVENTURE</div><button class="dialog-close" data-close aria-label="Close data and science">×</button></div>
+    <h2>Real data. Clear assumptions<span>.</span></h2><p class="dialog-description">Know what comes from NASA, what the game calculates, and what belongs to our fictional expedition.</p>
+    <div id="source-cards"></div>
+    <details class="assumptions" open><summary>Mission assumptions & limitations</summary><ul id="assumptions-list"></ul><p>ASTRA uses contextual rules grounded in the mission state. The ten lessons, equipment targets and power budgets are authored learning exercises. Greenhouse demand is a simplified power allocation, not a crop-growth simulation. The shelter and airlock drills model training procedures. Solar output and radio quality are game models; collected rocks and supply crates are fictional. Multiplayer is not included.</p></details>
+    <div class="data-footer">Independent educational prototype · no NASA endorsement implied</div>
+  </dialog>
+
+  <dialog id="help-dialog" class="help-dialog">
+    <div class="dialog-heading"><div class="eyebrow">YOUR FIELD GUIDE</div><button class="dialog-close" data-close aria-label="Close field guide">×</button></div>
+    <h2>A small step to get started<span>.</span></h2>
+    <p class="dialog-description">Start at level 1. Read the Next action card, follow the gold objective marker, and use its action button when you arrive. Completing the practical task earns your badge and unlocks the next level immediately. Ten lessons take you from Junior Cadet to Qualified Junior Astronaut. Knowledge checks earn optional bonus XP.</p>
+    <div class="help-controls"><div><kbd>W A S D</kbd><span>Move across the surface</span></div><div><kbd>CLICK / TAP</kbd><span>Plot a route without dragging</span></div><div><kbd>E</kbd><span>Repair, board, dismount, or dock</span></div><div><kbd>SHIFT</kbd><span>Sprint; uses more oxygen</span></div><div><kbd>SPACE</kbd><span>Try a lunar hop</span></div><div><kbd>Q</kbd><span>Record a nearby cyan survey</span></div><div><kbd>DRAG / ↻</kbd><span>Look all around the 3D scene</span></div><div><kbd>SHIFT + DRAG</kbd><span>Pan across the terrain in orbit view</span></div><div><kbd>F</kbd><span>Switch astronaut / orbit view</span></div><div><kbd>SCROLL / + −</kbd><span>Zoom the orbit camera</span></div><div><kbd>M</kbd><span>Switch surface / orbital data</span></div><div><kbd>P</kbd><span>Pause or resume the expedition</span></div></div>
+    <div class="help-tip">The white ribbon is your return route. The orange marker is your next objective. Optional cyan surveys earn research points. Tap the ASTRA button to open your companion. Drag either panel by its header to move it; focus the handle and use arrow keys for keyboard movement. ↺ resets a panel’s position.</div>
+    <div class="help-tip">Drag with the mouse or one finger to look through 360°. Drag vertically or use ↑ ↓ to change elevation. Pan terrain switches dragging to move the camera across the ground; Shift-drag or middle-drag also pans. Show objective frames your current destination; Overview shows YOU and the destination together. Astronaut view (F) places the camera at your visor, and Show objective turns your helmet toward the marker. WASD follows where you look. Follow astronaut restores your moving camera. The [ ] keys turn and , . change elevation. Equipment controls stay beside the 3D scene: watch the instructor, then perform each action yourself.</div>
+    <div class="help-tip">Surface is the playable world. Orbital data is an observation view; use Return to play to get back. The tracker always marks YOU. Go to objective calculates a terrain route; WASD takes over. Restore a hidden tutorial from Settings or the Tutorial button. Your badges and unlocked levels are saved in this browser.</div>
+    <button class="primary-button" data-close>Ready for the Moon <span aria-hidden="true">→</span></button>
+  </dialog>
+
+  <dialog id="settings-dialog" class="help-dialog" aria-labelledby="settings-title">
+    <div class="dialog-heading"><div class="eyebrow">GAME SETTINGS</div><button class="dialog-close" data-close aria-label="Close settings">×</button></div>
+    <h2 id="settings-title">Make the mission yours.</h2>
+    <div class="game-settings">
+      <label class="volume-control" for="music-volume"><span>Music and effects volume</span><output id="music-volume-value" for="music-volume">45%</output><input id="music-volume" type="range" min="0" max="100" value="45"></label>
+      <button class="secondary-button settings-toggle" id="music-toggle" aria-pressed="true">Music and effects on</button>
+      <button class="secondary-button settings-toggle" id="motion-button" aria-pressed="false">Full cinematic motion</button>
+      <button class="secondary-button settings-toggle" id="opening-toggle" aria-pressed="true">Opening animation on</button>
+      <p>The opening plays once when you enter the game, then continues into your training. This setting applies on your next visit; Skip story skips only the current opening.</p>
+      <button class="secondary-button settings-toggle" id="tutorial-setting-toggle" aria-pressed="true">Tutorial on</button>
+      <p id="tutorial-setting">Action-by-action guidance is enabled.</p>
+      <button class="secondary-button" id="tutorial-restart">Show tutorial for this level ↗</button>
+      <button class="secondary-button settings-toggle" id="labels-button" aria-pressed="true">High contrast world labels on</button>
+      <button class="secondary-button settings-toggle" id="reset-camera">Reset camera and follow astronaut ↺</button>
+      <button class="secondary-button settings-toggle" id="reset-panels">Reset tutorial and ASTRA positions ↺</button>
+      <small>Music, motion, labels, tutorial preference, badges and unlocked levels are remembered in this browser when storage is available. Showing the tutorial keeps your current progress.</small>
+    </div>
+    <button class="primary-button" data-close>Return to game →</button>
+  </dialog>
+
+  <dialog id="levels-dialog" class="levels-dialog" aria-labelledby="levels-title">
+    <div class="dialog-heading"><div class="eyebrow">JUNIOR ASTRONAUT ACADEMY</div><button class="dialog-close" data-close aria-label="Close levels">×</button></div><h2 id="levels-title">Your path to the crew.</h2><p class="dialog-description">Ten practical missions. Complete each field task to earn a badge and unlock the next mission. Knowledge checks are optional. Selecting a level begins that lesson from its briefing.</p><div id="level-list"></div>
+  </dialog>
+
+  <dialog id="systems-dialog" class="systems-dialog" aria-labelledby="systems-title">
+    <div class="dialog-heading"><div class="eyebrow">HAVEN / SYSTEMS WORKBENCH</div><button class="dialog-close" data-close aria-label="Close systems workbench">×</button></div><h2 id="systems-title">Keep the outpost alive.</h2><p class="dialog-description" id="systems-description"></p>
+    <div class="power-supply"><strong id="power-supply">12 kW supply</strong><span id="power-budget">—</span></div>
+    <div class="power-rows" id="power-rows"><label for="power-life"><span>Life support <small id="demand-life"></small></span><output id="value-life">2 kW</output><input id="power-life" type="range" min="0" max="12" step="1" value="2"></label><label for="power-food"><span>Greenhouse <small id="demand-food"></small></span><output id="value-food">2 kW</output><input id="power-food" type="range" min="0" max="12" step="1" value="2"></label><label for="power-comms"><span>Communications <small id="demand-comms"></small></span><output id="value-comms">1 kW</output><input id="power-comms" type="range" min="0" max="12" step="1" value="1"></label></div>
+    <label class="seal-control" id="seal-control" hidden><input id="shelter-seal" type="checkbox"> Seal the shelter and confirm crew inside</label><p id="power-feedback" role="status"></p><button class="primary-button" id="apply-power" disabled>Confirm systems plan →</button>
+  </dialog>
+  <script src="game.js?v=0.9.0" defer></script>
+</body>
+</html>

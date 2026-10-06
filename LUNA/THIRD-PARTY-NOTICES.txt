@@ -1,0 +1,1 @@
+LUNA includes Three.js 0.180.0 (MIT), bundled in dist/game.js, and uses esbuild 0.25.10 (MIT) for builds. Their licence texts are in licenses/. The generated bundle retains applicable legal comments. NASA/JPL data provenance and authored scenario limitations are documented in README.md and the game.

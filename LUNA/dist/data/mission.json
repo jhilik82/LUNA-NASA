@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "id": "echo-recovery",
+  "name": "The silent rover",
+  "seed": 47026,
+  "briefing": "Echo's power bus failed during a survey. Restore the surface relay, recover the rover, and bring its research home to Haven.",
+  "classification": "Authored educational scenario. Crew, hardware, structures, failures and equipment parameters are fictional. Terrain and celestial vectors come from NASA/JPL.",
+  "timeScale": 10,
+  "startHourTdb": 12,
+  "walkMetresPerSecond": 1.4,
+  "sprintMultiplier": 1.7,
+  "roverMetresPerSecond": 4.5,
+  "walkMaxSlopeDegrees": 32,
+  "roverMaxSlopeDegrees": 20,
+  "interactionMetres": 105,
+  "suit": {
+    "oxygenMinutes": 100,
+    "waterLitres": 0.9,
+    "waterLitresPerHour": 0.25,
+    "batteryWh": 240,
+    "idleWatts": 70,
+    "movingWatts": 110,
+    "scanWh": 3,
+    "scanMinutes": 0.3,
+    "sprintOxygenMultiplier": 1.65
+  },
+  "rover": {
+    "capacityWh": 5000,
+    "recoveryWh": 4200,
+    "idleWatts": 150,
+    "driveWatts": 1400,
+    "consumptionWhPerMetre": 0.08
+  },
+  "physics": {
+    "moonSurfaceGravityMetresPerSecondSquared": 1.62,
+    "source": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+    "classification": "Rounded lunar physical constant; used by the jump animation."
+  },
+  "art": {
+    "terrainVerticalExaggeration": 1.35,
+    "artisticLighting": "Illustrative fixed light direction, not a computed lunar illumination product. Structures and small decorative rocks are illustrations."
+  },
+  "objectNames": {
+    "base": "HAVEN / 01",
+    "relay": "SURFACE RELAY / A",
+    "rover": "ECHO / 03"
+  },
+  "assumptions": [
+    "Mission time runs at 10 times wall-clock time. Pause, briefing and repair puzzle screens freeze mission time.",
+    "Oxygen is represented as equivalent minutes at a nominal draw. Walking, slope and sprinting change that draw. No medical or operational EVA safety claim is made.",
+    "Vehicle, suit and water parameters are editable teaching assumptions, not specifications for flight hardware.",
+    "Routes use slopes from the averaged DEM, 8-neighbour graph traversal, and fictional equipment slope limits. Sub-grid hazards are not resolved.",
+    "The Lifeline is a conservative educational estimate using the selected route, nominal movement rates and a 20 percent return reserve.",
+    "Terrain is in a lunar body-fixed frame. The orbital view uses Moon-centred ICRF vectors; the two views are not merged into an operational navigation solution."
+  ],
+  "returnReserveFraction": 0.2
+}

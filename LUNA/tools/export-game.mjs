@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const dist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
+const read=n=>fs.readFileSync(path.join(dist,n),'utf8');
+const pack={terrain:JSON.parse(read('data/terrain.json')),config:JSON.parse(read('data/mission.json')),ephemerides:JSON.parse(read('data/ephemerides.json')),academy:JSON.parse(read('data/academy.json'))};
+const escaped=s=>s.replace(/<\/script/gi,'<\\/script');
+let html=read('index.html').replace(/<link rel="stylesheet" href="styles\.css(?:\?[^"]*)?">/,'<style>'+read('styles.css')+'</style>');
+html=html.replace(/<script src="game\.js(?:\?[^\"]*)?" defer><\/script>/,'<script>window.LUNA_DATA='+JSON.stringify(pack).replace(/</g,'\\u003c')+';</script>\n<script>'+escaped(read('game.js'))+'</script>');
+const destination=path.join(dist,'luna-playable.html');fs.writeFileSync(destination,html);
+console.log(JSON.stringify({file:destination,bytes:Buffer.byteLength(html),offline:true,renderer:'WebGL 2',embeddedData:true}));
