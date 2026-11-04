@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "LUNA: develop and open browser",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/tools/dev.mjs",
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "skipFiles": ["<node_internals>/**"],
+      "serverReadyAction": {"pattern":"LUNA game: (http://localhost:[0-9]+)","uriFormat":"%s","action":"openExternally"}
+    },
+    {
+      "name": "LUNA: run prepared game",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/tools/serve.mjs",
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "skipFiles": ["<node_internals>/**"],
+      "serverReadyAction": {"pattern":"LUNA game: (http://localhost:[0-9]+)","uriFormat":"%s","action":"openExternally"}
+    }
+  ]
+}

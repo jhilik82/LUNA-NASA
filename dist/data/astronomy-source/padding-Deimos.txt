@@ -1,0 +1,128 @@
+*******************************************************************************
+ Revised: Jun 02, 2025             Deimos / (Mars)                          402
+
+ SATELLITE PHYSICAL PROPERTIES:
+  Radius (km)             = 7.8 x 6.0 x 5.1 Density (g cm^-3)   =  1.76 +- 0.30
+  Mass (10^20 kg )        = 1.80 (10^-5)    Geometric Albedo    =  0.06 
+                               (+- 0.15)    V(1,0)              = +12.89
+
+ SATELLITE ORBITAL DATA:
+  Semi-major axis, a (km) = 23.4632(10^3)   Orbital period      = 1.263 d
+  Eccentricity, e         =  0.00033        Rotational period   = Synchronous
+  Inclination, i  (deg)   =  1.791
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Tue Oct  6 03:12:49 2026 Pasadena, USA      / Horizons
+*******************************************************************************
+Target body name: Deimos (402)                    {source: mar099}
+Center body name: Sun (10)                        {source: DE441}
+Center-site name: BODY CENTER
+*******************************************************************************
+Start time      : A.D. 2026-Oct-02 00:00:00.0000 TDB
+Stop  time      : A.D. 2026-Oct-03 00:00:00.0000 TDB
+Step-size       : 60 minutes
+*******************************************************************************
+Center geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}
+Output units    : KM-S
+Calendar mode   : Mixed Julian/Gregorian
+Output type     : GEOMETRIC cartesian states
+Output format   : 2 (position and velocity)
+Reference frame : ICRF
+*******************************************************************************
+            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,                     VX,                     VY,                     VZ,
+**************************************************************************************************************************************************************************************************
+$$SOE
+2461315.500000000, A.D. 2026-Oct-02 00:00:00.0000,  1.703598357226971E+07,  2.116842555619035E+08,  9.663357678737412E+07, -2.443474474097575E+01,  3.344663759648953E+00,  2.756633392951450E+00,
+2461315.541666667, A.D. 2026-Oct-02 01:00:00.0000,  1.694792066087432E+07,  2.116958242034694E+08,  9.664330672625759E+07, -2.448037482996664E+01,  3.082604639757298E+00,  2.644681028734941E+00,
+2461315.583333333, A.D. 2026-Oct-02 02:00:00.0000,  1.685978842073319E+07,  2.117064586232853E+08,  9.665259118440886E+07, -2.447312503299829E+01,  2.827459031623458E+00,  2.510006155429671E+00,
+2461315.625000000, A.D. 2026-Oct-02 03:00:00.0000,  1.677177731256917E+07,  2.117162029692292E+08,  9.666135821912487E+07, -2.441332434776533E+01,  2.589838880340775E+00,  2.358229767137793E+00,
+2461315.666666667, A.D. 2026-Oct-02 04:00:00.0000,  1.668407252624633E+07,  2.117251383745296E+08,  9.666955752786723E+07, -2.430356165381938E+01,  2.379605392723392E+00,  2.195709833076348E+00,
+2461315.708333333, A.D. 2026-Oct-02 05:00:00.0000,  1.659684601584996E+07,  2.117333794759370E+08,  9.667716261585227E+07, -2.414857479321912E+01,  2.205443151416796E+00,  2.029267151043959E+00,
+2461315.750000000, A.D. 2026-Oct-02 06:00:00.0000,  1.651024910439466E+07,  2.117410694851366E+08,  9.668417193652594E+07, -2.395504619549179E+01,  2.074485221250372E+00,  1.865890983413715E+00,
+2461315.791666667, A.D. 2026-Oct-02 07:00:00.0000,  1.642440597954582E+07,  2.117483740275728E+08,  9.669060895535554E+07, -2.373131407969632E+01,  1.992005788051905E+00,  1.712437469778303E+00,
+2461315.833333333, A.D. 2026-Oct-02 08:00:00.0000,  1.633940836227868E+07,  2.117554740169813E+08,  9.669652113481516E+07, -2.348701204251480E+01,  1.961193744471988E+00,  1.575334080213909E+00,
+2461315.875000000, A.D. 2026-Oct-02 09:00:00.0000,  1.625531157834602E+07,  2.117625578757132E+08,  9.670197788580079E+07, -2.323265302073868E+01,  1.983016944771220E+00,  1.460303054776646E+00,
+2461315.916666667, A.D. 2026-Oct-02 10:00:00.0000,  1.617213220034036E+07,  2.117698134386618E+08,  9.670706757582234E+07, -2.297917598861953E+01,  2.056182754632101E+00,  1.372115846462801E+00,
+2461315.958333333, A.D. 2026-Oct-02 11:00:00.0000,  1.608984735906570E+07,  2.117774198911311E+08,  9.671189372508796E+07, -2.273747525515724E+01,  2.177196218358442E+00,  1.314389119473198E+00,
+2461316.000000000, A.D. 2026-Oct-02 12:00:00.0000,  1.600839575008048E+07,  2.117855400880035E+08,  9.671657055626509E+07, -2.251793281372340E+01,  2.340512880903346E+00,  1.289430942703136E+00,
+2461316.041666667, A.D. 2026-Oct-02 13:00:00.0000,  1.592768028794922E+07,  2.117943135834594E+08,  9.672121809083126E+07, -2.232997388082468E+01,  2.538779221171053E+00,  1.298143563104414E+00,
+2461316.083333333, A.D. 2026-Oct-02 14:00:00.0000,  1.584757229015409E+07,  2.118038506683459E+08,  9.672595700346534E+07, -2.218166456401415E+01,  2.763149949086297E+00,  1.339986643375393E+00,
+2461316.125000000, A.D. 2026-Oct-02 15:00:00.0000,  1.576791700772397E+07,  2.118142276676943E+08,  9.673090345524487E+07, -2.207936864176335E+01,  3.003668238714924E+00,  1.413002241196591E+00,
+2461316.166666667, A.D. 2026-Oct-02 16:00:00.0000,  1.568854026315665E+07,  2.118254836960079E+08,  9.673616412626211E+07, -2.202747775156478E+01,  3.249692448295806E+00,  1.513900175605146E+00,
+2461316.208333333, A.D. 2026-Oct-02 17:00:00.0000,  1.560925591034197E+07,  2.118376190051466E+08,  9.674183165876864E+07, -2.202822609788143E+01,  3.490351016054533E+00,  1.638199883787518E+00,
+2461316.250000000, A.D. 2026-Oct-02 18:00:00.0000,  1.552987379759367E+07,  2.118505949916813E+08,  9.674798070370901E+07, -2.208159716545251E+01,  3.715006232514648E+00,  1.780422564527313E+00,
+2461316.291666667, A.D. 2026-Oct-02 19:00:00.0000,  1.545020789492408E+07,  2.118643358604591E+08,  9.675466473736590E+07, -2.218532602976081E+01,  3.913707350914472E+00,  1.934325344994941E+00,
+2461316.333333333, A.D. 2026-Oct-02 20:00:00.0000,  1.537008424088168E+07,  2.118787318715445E+08,  9.676191378194582E+07, -2.233499689842154E+01,  4.077614054400917E+00,  2.093167527278534E+00,
+2461316.375000000, A.D. 2026-Oct-02 21:00:00.0000,  1.528934837266859E+07,  2.118936440315271E+08,  9.676973312573127E+07, -2.252423160673580E+01,  4.199372617876468E+00,  2.249997706457258E+00,
+2461316.416666667, A.D. 2026-Oct-02 22:00:00.0000,  1.520787192539672E+07,  2.119089100300054E+08,  9.677810309647317E+07, -2.274496108987918E+01,  4.273429099326214E+00,  2.397949739923248E+00,
+2461316.458333333, A.D. 2026-Oct-02 23:00:00.0000,  1.512555812123266E+07,  2.119243511701642E+08,  9.678697989767206E+07, -2.298776849071072E+01,  4.296266486793623E+00,  2.530535208856687E+00,
+2461316.500000000, A.D. 2026-Oct-03 00:00:00.0000,  1.504234591540886E+07,  2.119397800007156E+08,  9.679629747300856E+07, -2.324228964479721E+01,  4.266555813090567E+00,  2.641920150050472E+00,
+$$EOE
+**************************************************************************************************************************************************************************************************
+ 
+TIME
+
+  Barycentric Dynamical Time ("TDB" or T_eph) output was requested. This
+continuous coordinate time is equivalent to the relativistic proper time
+of a clock at rest in a reference frame co-moving with the solar system
+barycenter but outside the system's gravity well. It is the independent
+variable in the solar system relativistic equations of motion.
+
+  TDB runs at a uniform rate of one SI second per second and is independent
+of irregularities in Earth's rotation.
+ 
+CALENDAR SYSTEM
+
+  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+are in the Julian calendar system, which is automatically extended for dates
+prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+matching historical dates. The Gregorian calendar more accurately corresponds
+to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+available if such physical events are the primary interest.
+
+REFERENCE FRAME AND COORDINATES
+
+  International Celestial Reference Frame (ICRF)
+
+    The ICRF is an adopted reference frame whose axes are defined relative to 
+    fixed extragalactic radio sources distributed across the sky.
+
+    The ICRF was aligned with the prior FK5/J2000 dynamical system at the ~0.02 
+    arcsecond level but is not identical and has no associated standard epoch.
+
+  Symbol meaning:
+
+    JDTDB    Julian Day Number, Barycentric Dynamical Time
+      X      X-component of position vector (km)
+      Y      Y-component of position vector (km)
+      Z      Z-component of position vector (km)
+      VX     X-component of velocity vector (km/sec)                           
+      VY     Y-component of velocity vector (km/sec)                           
+      VZ     Z-component of velocity vector (km/sec)                           
+
+ABERRATIONS AND CORRECTIONS
+
+ Geometric state vectors have NO corrections or aberrations applied.
+
+Computations by ...
+
+    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+    4800 Oak Grove Drive, Jet Propulsion Laboratory
+    Pasadena, CA  91109   USA
+
+    General site: https://ssd.jpl.nasa.gov/
+    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+                  command-line   telnet ssd.jpl.nasa.gov 6775
+                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+    Inquiries   : Jon.D.Giorgini@jpl.nasa.gov
+*******************************************************************************
