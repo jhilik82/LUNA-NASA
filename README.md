@@ -1,4 +1,4 @@
-# LUNA — Beyond the Lifeline · merged edition 1.3.1
+# LUNA — Beyond the Lifeline · 
 
 A complete editable Moon/Mars game: story → destination → boarding → launch → transfer → interactive landing → outpost mission.
 
