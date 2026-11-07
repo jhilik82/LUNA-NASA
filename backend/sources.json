@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "sources": [
+    {"id":"lola-label","name":"LRO / LOLA Mare Tranquillitatis product label","url":"https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/cylindrical/img/ldem_1024_00n_15n_000_030.lbl"},
+    {"id":"mola-label","name":"MGS / MOLA Jezero regional product label","url":"https://pds-geosciences.wustl.edu/mgs/mgs-m-mola-5-megdr-l3-v1/mgsl_300x/meg128/megt44n000hb.lbl"},
+    {"id":"star-catalogue","name":"Yale Bright Star Catalog distributed by NASA HEASARC","url":"https://heasarc.gsfc.nasa.gov/FTP/heasarc/dbase/dump/heasarc_bsc5p.tdat.gz"},
+    {"id":"body-orientation","name":"NASA NAIF planetary orientation kernel","url":"https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc"}
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "folders": [{"path":"."}],
+  "settings": {
+    "files.exclude": {"**/node_modules":true},
+    "search.exclude": {"**/node_modules":true,"dist/game.js":true,"dist/luna-playable.html":true,"backend/data":true},
+    "files.insertFinalNewline": true
+  }
+}

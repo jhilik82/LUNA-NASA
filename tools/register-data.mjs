@@ -1,0 +1,10 @@
+import path from 'node:path';
+import { PROJECT_ROOT, loadEnvironment } from '../backend/server.mjs';
+import { LocalStore } from '../backend/store.mjs';
+import { registerDatasets } from '../backend/datasets.mjs';
+await loadEnvironment();
+const option = process.argv.indexOf('--from');
+const source = option >= 0 ? path.resolve(process.argv[option + 1]) : path.join(PROJECT_ROOT, 'dist/data');
+const store = new LocalStore(path.resolve(PROJECT_ROOT, process.env.LUNA_DATA_DIR || 'backend/data'));
+const manifest = await registerDatasets(source, store);
+console.log('Validated and published pack ' + manifest.version + ' (' + manifest.datasets.length + ' datasets).');
