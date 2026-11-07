@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+backend/data/
+.data-stage/
+*.log
+__pycache__/
+.venv/
+dist/game.js.map

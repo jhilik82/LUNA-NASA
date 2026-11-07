@@ -1,0 +1,114 @@
+*******************************************************************************
+ Revised: Jan 26, 2022              Titan / (Saturn)                        606
+                         http://ssd.jpl.nasa.gov/?sat_phys_par
+                           http://ssd.jpl.nasa.gov/?sat_elem
+
+ SATELLITE PHYSICAL PROPERTIES:
+  Mean Radius (km)       = 2575.5   +-  2.0  Density (g/cm^3) =  1.880 +- 0.004
+  Mass (10^19 kg)        = 13455.3           Geometric Albedo =  0.2 
+  GM (km^3/s^2)          = 8978.14  +-  0.06  V(1,0)          = -1.28 
+
+ SATELLITE ORBITAL DATA:
+  Semi-major axis, a (km)= 1221.87 (10^3)  Orbital period     = 15.945421 d
+  Eccentricity, e        = 0.0288          Rotational period  = 
+  Inclination, i  (deg)  = 0.28
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Tue Oct  6 03:13:39 2026 Pasadena, USA      / Horizons
+*******************************************************************************
+Target body name: Titan (606)                     {source: sat441l}
+Center body name: Sun (10)                        {source: DE441}
+Center-site name: BODY CENTER
+*******************************************************************************
+Start time      : A.D. 2026-Oct-02 00:00:00.0000 TDB
+Stop  time      : A.D. 2026-Oct-03 00:00:00.0000 TDB
+Step-size       : 180 minutes
+*******************************************************************************
+Center geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}
+Output units    : KM-S
+Calendar mode   : Mixed Julian/Gregorian
+Output type     : GEOMETRIC cartesian states
+Output format   : 2 (position and velocity)
+Reference frame : ICRF
+*******************************************************************************
+            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,                     VX,                     VY,                     VZ,
+**************************************************************************************************************************************************************************************************
+$$SOE
+2461315.500000000, A.D. 2026-Oct-02 00:00:00.0000,  1.385725824040733E+09,  2.679103548592039E+08,  5.050951035134359E+07, -6.541712616790879E+00,  1.250405766838669E+01,  3.815557926330694E+00,
+2461315.625000000, A.D. 2026-Oct-02 03:00:00.0000,  1.385654202764375E+09,  2.680442304210197E+08,  5.055088223888737E+07, -6.719568833421722E+00,  1.228629647066472E+01,  3.845827799587889E+00,
+2461315.750000000, A.D. 2026-Oct-02 06:00:00.0000,  1.385580723443617E+09,  2.681757094246761E+08,  5.059257847673155E+07, -6.885734771756030E+00,  1.206035842584248E+01,  3.875610234414928E+00,
+2461315.875000000, A.D. 2026-Oct-02 09:00:00.0000,  1.385505514211724E+09,  2.683047070769813E+08,  5.063459339819183E+07, -7.039869118973109E+00,  1.182689685215981E+01,  3.904831160187875E+00,
+2461316.000000000, A.D. 2026-Oct-02 12:00:00.0000,  1.385428706677128E+09,  2.684311457029065E+08,  5.067692055113975E+07, -7.181669631513853E+00,  1.158657618211700E+01,  3.933419223029313E+00,
+2461316.125000000, A.D. 2026-Oct-02 15:00:00.0000,  1.385350435502010E+09,  2.685549548519059E+08,  5.071955272821689E+07, -7.310873008631909E+00,  1.134006943636505E+01,  3.961305944032919E+00,
+2461316.250000000, A.D. 2026-Oct-02 18:00:00.0000,  1.385270837983170E+09,  2.686760713774187E+08,  5.076248199864417E+07, -7.427254595989567E+00,  1.108805578584305E+01,  3.988425856427417E+00,
+2461316.375000000, A.D. 2026-Oct-02 21:00:00.0000,  1.385190053636959E+09,  2.687944394905825E+08,  5.080569974139927E+07, -7.530627930761722E+00,  1.083121821633766E+01,  4.014716621800256E+00,
+2461316.500000000, A.D. 2026-Oct-03 00:00:00.0000,  1.385108223789940E+09,  2.689100107893267E+08,  5.084919667953794E+07, -7.620844140294647E+00,  1.057024130567062E+01,  4.040119125828594E+00,
+$$EOE
+**************************************************************************************************************************************************************************************************
+ 
+TIME
+
+  Barycentric Dynamical Time ("TDB" or T_eph) output was requested. This
+continuous coordinate time is equivalent to the relativistic proper time
+of a clock at rest in a reference frame co-moving with the solar system
+barycenter but outside the system's gravity well. It is the independent
+variable in the solar system relativistic equations of motion.
+
+  TDB runs at a uniform rate of one SI second per second and is independent
+of irregularities in Earth's rotation.
+ 
+CALENDAR SYSTEM
+
+  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+are in the Julian calendar system, which is automatically extended for dates
+prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+matching historical dates. The Gregorian calendar more accurately corresponds
+to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+available if such physical events are the primary interest.
+
+REFERENCE FRAME AND COORDINATES
+
+  International Celestial Reference Frame (ICRF)
+
+    The ICRF is an adopted reference frame whose axes are defined relative to 
+    fixed extragalactic radio sources distributed across the sky.
+
+    The ICRF was aligned with the prior FK5/J2000 dynamical system at the ~0.02 
+    arcsecond level but is not identical and has no associated standard epoch.
+
+  Symbol meaning:
+
+    JDTDB    Julian Day Number, Barycentric Dynamical Time
+      X      X-component of position vector (km)
+      Y      Y-component of position vector (km)
+      Z      Z-component of position vector (km)
+      VX     X-component of velocity vector (km/sec)                           
+      VY     Y-component of velocity vector (km/sec)                           
+      VZ     Z-component of velocity vector (km/sec)                           
+
+ABERRATIONS AND CORRECTIONS
+
+ Geometric state vectors have NO corrections or aberrations applied.
+
+Computations by ...
+
+    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+    4800 Oak Grove Drive, Jet Propulsion Laboratory
+    Pasadena, CA  91109   USA
+
+    General site: https://ssd.jpl.nasa.gov/
+    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+                  command-line   telnet ssd.jpl.nasa.gov 6775
+                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+    Inquiries   : Jon.D.Giorgini@jpl.nasa.gov
+*******************************************************************************

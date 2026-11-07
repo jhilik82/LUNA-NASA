@@ -1,0 +1,118 @@
+*******************************************************************************
+ Revised: Apr 03, 2024              Charon / (Pluto)                        901 
+
+ Pre-computed solution PLU060/DE440. Fit to post New Horizons encounter and 
+ Gaia data through 2023.  For discussion, see ...
+
+ M. Brozovic, R. A. Jacobson (2024) "Post-New Horizons orbits and masses 
+ for the satellites of Pluto". AJ (in press)
+
+ Satellite General Physical Properties (PLU060):
+  GM (km^3/s^2)           = 106.10 +- 0.3 Density (g cm^-3)     = 1.853 +- 0.004
+  Radius (km, IAU2015)    = 606 +- 0.5    Geometric albedo      = 
+  Mass (10^21 kg )        =               Hill Sphere radius, km= 
+  Surface gravity (cm/s^2)=               Escape velocity, km/s = 
+
+ Satellite mean orbital data (2000-Jan-01.5 TDB, planet-centered equatorial):
+  Semi-major axis, a (km) = 19600.        Orbital period, days  = 6.387222
+  Eccentricity, e         =     0.000     Inclination, deg.     = 0.0
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Tue Oct  6 03:14:29 2026 Pasadena, USA      / Horizons
+*******************************************************************************
+Target body name: Charon (901)                    {source: plu060_merged}
+Center body name: Sun (10)                        {source: plu060_merged}
+Center-site name: BODY CENTER
+*******************************************************************************
+Start time      : A.D. 2026-Oct-02 00:00:00.0000 TDB
+Stop  time      : A.D. 2026-Oct-03 00:00:00.0000 TDB
+Step-size       : 180 minutes
+*******************************************************************************
+Center geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}
+Output units    : KM-S
+Calendar mode   : Mixed Julian/Gregorian
+Output type     : GEOMETRIC cartesian states
+Output format   : 2 (position and velocity)
+Reference frame : ICRF
+*******************************************************************************
+            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,                     VX,                     VY,                     VZ,
+**************************************************************************************************************************************************************************************************
+$$SOE
+2461315.500000000, A.D. 2026-Oct-02 00:00:00.0000,  2.987019348746998E+09, -3.874342510824060E+09, -2.108921007496860E+09,  4.618562519467698E+00,  2.248611137367063E+00, -8.761346282532033E-01,
+2461315.625000000, A.D. 2026-Oct-02 03:00:00.0000,  2.987069133764898E+09, -3.874318308932895E+09, -2.108930432183530E+09,  4.600961708565753E+00,  2.233362862597314E+00, -8.687033418499936E-01,
+2461315.750000000, A.D. 2026-Oct-02 06:00:00.0000,  2.987118731646045E+09, -3.874294266703672E+09, -2.108939761467888E+09,  4.583951193091707E+00,  2.219081474942602E+00, -8.584898051282288E-01,
+2461315.875000000, A.D. 2026-Oct-02 09:00:00.0000,  2.987168150160875E+09, -3.874270372511642E+09, -2.108948966097860E+09,  4.567787527959054E+00,  2.205983209029289E+00, -8.456482993099739E-01,
+2461316.000000000, A.D. 2026-Oct-02 12:00:00.0000,  2.987217399784635E+09, -3.874246612490694E+09, -2.108958018704371E+09,  4.552714417979373E+00,  2.194266373562366E+00, -8.303728034208101E-01,
+2461316.125000000, A.D. 2026-Oct-02 15:00:00.0000,  2.987266493538523E+09, -3.874222970743386E+09, -2.108966894214668E+09,  4.538959035738603E+00,  2.184108358019325E+00, -8.128940438851522E-01,
+2461316.250000000, A.D. 2026-Oct-02 18:00:00.0000,  2.987315446792365E+09, -3.874199429581626E+09, -2.108975570230743E+09,  4.526728592954732E+00,  2.175662958737176E+00, -7.934759897278878E-01,
+2461316.375000000, A.D. 2026-Oct-02 21:00:00.0000,  2.987364277031879E+09, -3.874175969794313E+09, -2.108984027367149E+09,  4.516207216974367E+00,  2.169058064476018E+00, -7.724118475443832E-01,
+2461316.500000000, A.D. 2026-Oct-03 00:00:00.0000,  2.987413003594063E+09, -3.874152570937872E+09, -2.108992249543133E+09,  4.507553179234903E+00,  2.164393735922260E+00, -7.500196178467836E-01,
+$$EOE
+**************************************************************************************************************************************************************************************************
+ 
+TIME
+
+  Barycentric Dynamical Time ("TDB" or T_eph) output was requested. This
+continuous coordinate time is equivalent to the relativistic proper time
+of a clock at rest in a reference frame co-moving with the solar system
+barycenter but outside the system's gravity well. It is the independent
+variable in the solar system relativistic equations of motion.
+
+  TDB runs at a uniform rate of one SI second per second and is independent
+of irregularities in Earth's rotation.
+ 
+CALENDAR SYSTEM
+
+  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+are in the Julian calendar system, which is automatically extended for dates
+prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+matching historical dates. The Gregorian calendar more accurately corresponds
+to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+available if such physical events are the primary interest.
+
+REFERENCE FRAME AND COORDINATES
+
+  International Celestial Reference Frame (ICRF)
+
+    The ICRF is an adopted reference frame whose axes are defined relative to 
+    fixed extragalactic radio sources distributed across the sky.
+
+    The ICRF was aligned with the prior FK5/J2000 dynamical system at the ~0.02 
+    arcsecond level but is not identical and has no associated standard epoch.
+
+  Symbol meaning:
+
+    JDTDB    Julian Day Number, Barycentric Dynamical Time
+      X      X-component of position vector (km)
+      Y      Y-component of position vector (km)
+      Z      Z-component of position vector (km)
+      VX     X-component of velocity vector (km/sec)                           
+      VY     Y-component of velocity vector (km/sec)                           
+      VZ     Z-component of velocity vector (km/sec)                           
+
+ABERRATIONS AND CORRECTIONS
+
+ Geometric state vectors have NO corrections or aberrations applied.
+
+Computations by ...
+
+    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+    4800 Oak Grove Drive, Jet Propulsion Laboratory
+    Pasadena, CA  91109   USA
+
+    General site: https://ssd.jpl.nasa.gov/
+    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+                  command-line   telnet ssd.jpl.nasa.gov 6775
+                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+    Inquiries   : Jon.D.Giorgini@jpl.nasa.gov
+*******************************************************************************

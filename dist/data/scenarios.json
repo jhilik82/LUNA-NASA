@@ -1,0 +1,725 @@
+{
+  "schema": 1,
+  "classification": "Authored educational scenarios. Resource rates, events, equipment, exposure and probabilities are illustrative; no measured NASA emergency data.",
+  "crew": 4,
+  "rates": {
+    "waterLitresPerCrewHour": 0.16,
+    "foodPortionsPerCrewHour": 0.12,
+    "lifeMinimumKw": 2.4,
+    "baseLoadKw": 0.45,
+    "leakCrewHoursPerHour": 5,
+    "radiationHealthLossPerMsv": 0.5,
+    "evaOxygenReserveMinutes": 20,
+    "evaBatteryReserveWh": 18,
+    "resupplyHours": 4,
+    "cropCycleHours": 6,
+    "cropHarvestPortions": 2,
+    "earthMessageEnergyKwh": 0.15
+  },
+  "moon": {
+    "id": "tranquillitatis-haven",
+    "title": "Haven: the first watch",
+    "brief": "Stabilize a Mare Tranquillitatis outpost, protect four crewmates, repair a field relay, and return a basalt sample. Your seven decisions must leave the crew able to survive four hours until resupply.",
+    "skill": "Outpost operations, EVA planning and resource trade-offs",
+    "badge": "Lunar Mission Commander",
+    "rank": "Lunar Mission Commander",
+    "minimumScience": 45,
+    "initial": {
+      "oxygen": 36,
+      "water": 32,
+      "food": 20,
+      "energy": 30,
+      "habitat": 68,
+      "health": 100,
+      "fatigue": 8,
+      "radiation": 0,
+      "radiationRate": 0.08,
+      "dust": 0,
+      "arrayKw": 8,
+      "arrayOnline": false,
+      "lifeKw": 2.4,
+      "foodKw": 2,
+      "commsKw": 0.8,
+      "shield": "none",
+      "shieldKw": 0,
+      "backupKw": 0,
+      "fuel": 18,
+      "kits": 3,
+      "science": 0,
+      "leak": true,
+      "relay": false,
+      "suitFactor": 1,
+      "growthHours": 0,
+      "harvests": 0
+    },
+    "stages": [
+      {
+        "id": "power",
+        "title": "Restore Haven\u2019s distribution bus",
+        "location": "base",
+        "task": "circuit",
+        "description": "The damaged bus is isolating the array. Reconnect the wires, then decide how to distribute the restored supply.",
+        "options": [
+          {
+            "id": "essential",
+            "label": "Protect life support; dim the greenhouse",
+            "minutes": 5,
+            "effects": {
+              "lifeKw": 2.4,
+              "foodKw": 1,
+              "commsKw": 0.5,
+              "arrayOnline": true
+            },
+            "explanation": "A smaller harvest protects oxygen production and the battery reserve."
+          },
+          {
+            "id": "growth",
+            "label": "Grow extra food now",
+            "minutes": 5,
+            "effects": {
+              "lifeKw": 2.4,
+              "foodKw": 4,
+              "commsKw": 1,
+              "arrayOnline": true,
+              "food": 3,
+              "water": -3
+            },
+            "explanation": "Extra food uses water and power. Watch the battery forecast."
+          },
+          {
+            "id": "battery",
+            "label": "Use the reserve and bypass the array",
+            "minutes": 3,
+            "effects": {
+              "arrayOnline": false,
+              "lifeKw": 2.4,
+              "foodKw": 1,
+              "commsKw": 0.5,
+              "energy": -5,
+              "habitat": -5
+            },
+            "explanation": "Quick to restore, but the outpost stays dependent on stored energy."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "air",
+        "title": "Seal a slow habitat leak",
+        "location": "base",
+        "task": "inspection",
+        "description": "Inspect the airlock seals. A leak is using oxygen that the crew will need until resupply.",
+        "options": [
+          {
+            "id": "patch",
+            "label": "Fit a replacement gasket",
+            "minutes": 8,
+            "effects": {
+              "leak": false,
+              "kits": -1,
+              "habitat": 12
+            },
+            "explanation": "A maintenance kit repairs the leak and improves habitat condition."
+          },
+          {
+            "id": "isolate",
+            "label": "Isolate the workshop",
+            "minutes": 4,
+            "effects": {
+              "leak": false,
+              "habitat": 5,
+              "foodKw": 0.6,
+              "science": -5
+            },
+            "explanation": "Closing a module saves oxygen but reduces available laboratory space."
+          },
+          {
+            "id": "purge",
+            "label": "Flush the module and defer the repair",
+            "minutes": 3,
+            "effects": {
+              "oxygen": -8,
+              "habitat": -10
+            },
+            "explanation": "The leak continues. Flushing wastes oxygen and does not repair the gasket."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "shelter",
+        "title": "Respond to a radiation training alert",
+        "location": "base",
+        "task": "shelter",
+        "description": "A fictional solar-particle alert has arrived. Choose protection before the EVA. These dose rates are game assumptions.",
+        "options": [
+          {
+            "id": "passive",
+            "label": "Move supplies into passive shelter walls",
+            "minutes": 10,
+            "effects": {
+              "shield": "passive",
+              "habitat": 5,
+              "water": -1
+            },
+            "explanation": "Stored material adds shielding without continuous electrical demand."
+          },
+          {
+            "id": "active",
+            "label": "Use the experimental powered shield",
+            "minutes": 3,
+            "effects": {
+              "shield": "active",
+              "shieldKw": 3
+            },
+            "explanation": "An experimental teaching concept: uses extra power to reduce modelled exposure. This is not flight-ready protection; passive shelter is the established strategy in this exercise."
+          },
+          {
+            "id": "none",
+            "label": "Continue without extra shielding",
+            "minutes": 1,
+            "effects": {
+              "shield": "none",
+              "health": -8
+            },
+            "explanation": "The crew is more exposed during the alert; health and the EVA envelope decline."
+          }
+        ],
+        "hazard": {
+          "radiation": 6
+        }
+      },
+      {
+        "id": "payload",
+        "title": "Prepare and release the EVA",
+        "location": "base",
+        "task": "airlock",
+        "description": "Check the suit, seal the inner hatch, vent, and open the outer hatch. Then choose a field load.",
+        "options": [
+          {
+            "id": "light",
+            "label": "Take the light science kit",
+            "minutes": 4,
+            "effects": {
+              "payload": "light",
+              "suitFactor": 1,
+              "science": 5
+            },
+            "explanation": "The light load preserves walking speed and suit reserves."
+          },
+          {
+            "id": "full",
+            "label": "Carry the expanded instrument pack",
+            "minutes": 7,
+            "effects": {
+              "payload": "full",
+              "suitFactor": 1.4,
+              "science": 15,
+              "fatigue": 8
+            },
+            "explanation": "More instruments improve science but consume more oxygen and crew energy."
+          },
+          {
+            "id": "reserve",
+            "label": "Carry extra emergency oxygen",
+            "minutes": 6,
+            "effects": {
+              "payload": "reserve",
+              "suitFactor": 1.12,
+              "oxygen": -2,
+              "suitOxygen": 20
+            },
+            "explanation": "Transferred outpost oxygen extends the suit reserve; it is not free oxygen."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "relay",
+        "title": "Repair the field relay",
+        "location": "relay",
+        "task": "circuit",
+        "description": "Reach the orange relay and reconnect its signal circuit. Your suit, return route, and exposure continue to matter.",
+        "options": [
+          {
+            "id": "robust",
+            "label": "Fit a tested spare board",
+            "minutes": 8,
+            "effects": {
+              "kits": -1,
+              "relay": true,
+              "habitat": 3
+            },
+            "explanation": "A reliable repair uses a maintenance kit."
+          },
+          {
+            "id": "manual",
+            "label": "Calibrate the damaged board",
+            "minutes": 14,
+            "effects": {
+              "relay": true,
+              "fatigue": 5
+            },
+            "explanation": "Saves the spare, but the longer EVA uses oxygen and battery."
+          },
+          {
+            "id": "bypass",
+            "label": "Install a temporary bypass",
+            "minutes": 4,
+            "effects": {
+              "relay": true,
+              "habitat": -8,
+              "energy": -2
+            },
+            "explanation": "Quick to connect, but the bypass costs energy and reduces reliability."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "science",
+        "title": "Collect and document a basalt sample",
+        "location": "science",
+        "task": "sample",
+        "description": "Walk to the cyan field marker. Use the scan and sample tools, then choose the scope of the observation.",
+        "options": [
+          {
+            "id": "targeted",
+            "label": "Tag and seal one representative sample",
+            "minutes": 8,
+            "effects": {
+              "science": 50
+            },
+            "explanation": "A focused observation records location and conserves EVA time."
+          },
+          {
+            "id": "extended",
+            "label": "Run the full instrument survey",
+            "minutes": 16,
+            "effects": {
+              "science": 75,
+              "fatigue": 10,
+              "suitEnergy": -25
+            },
+            "explanation": "More science costs time, battery, and crew energy."
+          },
+          {
+            "id": "abort",
+            "label": "Photograph the site and return early",
+            "minutes": 2,
+            "effects": {
+              "science": 15
+            },
+            "explanation": "The crew uses fewer reserves, but the science goal may remain unmet."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "return",
+        "title": "Return, stow the sample, and secure Haven",
+        "location": "base",
+        "task": "stow",
+        "description": "Return to the white Haven marker. Stow the sample and select the operating plan that must last until resupply.",
+        "options": [
+          {
+            "id": "sustain",
+            "label": "Turn off extra loads; replenish the suit",
+            "minutes": 8,
+            "effects": {
+              "foodKw": 0.6,
+              "commsKw": 0.5,
+              "shieldKw": 0,
+              "shield": "passive",
+              "fatigue": -15,
+              "health": 4,
+              "oxygen": -0.5,
+              "energy": -0.02,
+              "suitOxygen": 30,
+              "suitEnergy": 20
+            },
+            "explanation": "Essential loads and passive protection preserve the remaining resources. Transfer 30 nominal oxygen minutes and 20 Wh from Haven to the suit."
+          },
+          {
+            "id": "science",
+            "label": "Use the experimental powered shield",
+            "minutes": 4,
+            "effects": {
+              "foodKw": 3.5,
+              "shieldKw": 3,
+              "shield": "active",
+              "science": 10
+            },
+            "explanation": "An experimental teaching concept: uses extra power to reduce modelled exposure. This is not flight-ready protection; passive shelter is the established strategy in this exercise."
+          },
+          {
+            "id": "generator",
+            "label": "Spend the emergency fuel on the backup generator",
+            "minutes": 6,
+            "effects": {
+              "backupKw": 2,
+              "fuel": -8,
+              "fatigue": -8
+            },
+            "explanation": "The backup adds 2 kW but consumes the finite emergency reserve."
+          }
+        ],
+        "hazard": null
+      }
+    ]
+  },
+  "mars": {
+    "id": "jezero-haven",
+    "title": "Jezero: hold the line",
+    "brief": "Keep a Jezero outpost supplied through a dust advisory, repair communications, and return a sediment sample. Protect the four-person crew and leave four hours of reserves for resupply.",
+    "skill": "Dust response, life support and surface science",
+    "badge": "Martian Mission Commander",
+    "rank": "Martian Mission Commander",
+    "minimumScience": 55,
+    "initial": {
+      "oxygen": 40,
+      "water": 34,
+      "food": 22,
+      "energy": 32,
+      "habitat": 68,
+      "health": 100,
+      "fatigue": 8,
+      "radiation": 0,
+      "radiationRate": 0.15,
+      "dust": 0.28,
+      "arrayKw": 7,
+      "arrayOnline": false,
+      "lifeKw": 2.4,
+      "foodKw": 2,
+      "commsKw": 0.8,
+      "shield": "none",
+      "shieldKw": 0,
+      "backupKw": 0,
+      "fuel": 18,
+      "kits": 3,
+      "science": 0,
+      "leak": true,
+      "relay": false,
+      "suitFactor": 1,
+      "growthHours": 0,
+      "harvests": 0
+    },
+    "stages": [
+      {
+        "id": "power",
+        "title": "Restore Jezero\u2019s dusty power bus",
+        "location": "base",
+        "task": "circuit",
+        "description": "Reconnect the distribution bus. Dust is reducing solar supply; choose essential loads before sending the crew outside.",
+        "options": [
+          {
+            "id": "essential",
+            "label": "Protect life support; dim the greenhouse",
+            "minutes": 5,
+            "effects": {
+              "lifeKw": 2.4,
+              "foodKw": 1,
+              "commsKw": 0.5,
+              "arrayOnline": true
+            },
+            "explanation": "A smaller harvest protects oxygen production and the battery reserve."
+          },
+          {
+            "id": "growth",
+            "label": "Grow extra food now",
+            "minutes": 5,
+            "effects": {
+              "lifeKw": 2.4,
+              "foodKw": 4,
+              "commsKw": 1,
+              "arrayOnline": true,
+              "food": 3,
+              "water": -3
+            },
+            "explanation": "Extra food uses water and power. Watch the battery forecast."
+          },
+          {
+            "id": "battery",
+            "label": "Use the reserve and bypass the array",
+            "minutes": 3,
+            "effects": {
+              "arrayOnline": false,
+              "lifeKw": 2.4,
+              "foodKw": 1,
+              "commsKw": 0.5,
+              "energy": -5,
+              "habitat": -5
+            },
+            "explanation": "Quick to restore, but the outpost stays dependent on stored energy."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "air",
+        "title": "Seal a slow habitat leak",
+        "location": "base",
+        "task": "inspection",
+        "description": "Inspect the airlock seals. A leak is using oxygen that the crew will need until resupply.",
+        "options": [
+          {
+            "id": "patch",
+            "label": "Fit a replacement gasket",
+            "minutes": 8,
+            "effects": {
+              "leak": false,
+              "kits": -1,
+              "habitat": 12
+            },
+            "explanation": "A maintenance kit repairs the leak and improves habitat condition."
+          },
+          {
+            "id": "isolate",
+            "label": "Isolate the workshop",
+            "minutes": 4,
+            "effects": {
+              "leak": false,
+              "habitat": 5,
+              "foodKw": 0.6,
+              "science": -5
+            },
+            "explanation": "Closing a module saves oxygen but reduces available laboratory space."
+          },
+          {
+            "id": "purge",
+            "label": "Flush the module and defer the repair",
+            "minutes": 3,
+            "effects": {
+              "oxygen": -8,
+              "habitat": -10
+            },
+            "explanation": "The leak continues. Flushing wastes oxygen and does not repair the gasket."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "shelter",
+        "title": "Respond to a dust advisory",
+        "location": "base",
+        "task": "inspection",
+        "description": "A restrained fictional dust front is approaching. Decide how to protect power and air filtration.",
+        "options": [
+          {
+            "id": "clean",
+            "label": "Brush the panels and protect the air filter",
+            "minutes": 10,
+            "effects": {
+              "dust": 0.22,
+              "kits": -1,
+              "habitat": 6
+            },
+            "explanation": "Cleaning improves generation and protects the habitat; it uses a service kit."
+          },
+          {
+            "id": "backup",
+            "label": "Deploy backup power",
+            "minutes": 4,
+            "effects": {
+              "backupKw": 2,
+              "fuel": -8,
+              "foodKw": 1
+            },
+            "explanation": "A 2 kW generator supports essentials while dust reduces array output."
+          },
+          {
+            "id": "wait",
+            "label": "Wait out the dust without maintenance",
+            "minutes": 1,
+            "effects": {
+              "habitat": -8
+            },
+            "explanation": "The array stays dusty. Check the energy deficit before the EVA."
+          }
+        ],
+        "hazard": {
+          "dust": 0.65,
+          "radiation": 0.15
+        }
+      },
+      {
+        "id": "payload",
+        "title": "Prepare and release the EVA",
+        "location": "base",
+        "task": "airlock",
+        "description": "Check the suit, seal the inner hatch, vent, and open the outer hatch. Then choose a field load.",
+        "options": [
+          {
+            "id": "light",
+            "label": "Take the light science kit",
+            "minutes": 4,
+            "effects": {
+              "payload": "light",
+              "suitFactor": 1,
+              "science": 5
+            },
+            "explanation": "The light load preserves walking speed and suit reserves."
+          },
+          {
+            "id": "full",
+            "label": "Carry the expanded instrument pack",
+            "minutes": 7,
+            "effects": {
+              "payload": "full",
+              "suitFactor": 1.4,
+              "science": 15,
+              "fatigue": 8
+            },
+            "explanation": "More instruments improve science but consume more oxygen and crew energy."
+          },
+          {
+            "id": "reserve",
+            "label": "Carry extra emergency oxygen",
+            "minutes": 6,
+            "effects": {
+              "payload": "reserve",
+              "suitFactor": 1.12,
+              "oxygen": -2,
+              "suitOxygen": 20
+            },
+            "explanation": "Transferred outpost oxygen extends the suit reserve; it is not free oxygen."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "relay",
+        "title": "Repair the field relay",
+        "location": "relay",
+        "task": "circuit",
+        "description": "Reach the orange relay and reconnect its signal circuit. Your suit, return route, and exposure continue to matter.",
+        "options": [
+          {
+            "id": "robust",
+            "label": "Fit a tested spare board",
+            "minutes": 8,
+            "effects": {
+              "kits": -1,
+              "relay": true,
+              "habitat": 3
+            },
+            "explanation": "A reliable repair uses a maintenance kit."
+          },
+          {
+            "id": "manual",
+            "label": "Calibrate the damaged board",
+            "minutes": 14,
+            "effects": {
+              "relay": true,
+              "fatigue": 5
+            },
+            "explanation": "Saves the spare, but the longer EVA uses oxygen and battery."
+          },
+          {
+            "id": "bypass",
+            "label": "Install a temporary bypass",
+            "minutes": 4,
+            "effects": {
+              "relay": true,
+              "habitat": -8,
+              "energy": -2
+            },
+            "explanation": "Quick to connect, but the bypass costs energy and reduces reliability."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "science",
+        "title": "Sample Jezero\u2019s sedimentary outcrop",
+        "location": "science",
+        "task": "sample",
+        "description": "Reach the cyan Jezero science marker. Measure the source-grid elevation and collect an illustrative sediment sample. The rock microstructure is reconstructed.",
+        "options": [
+          {
+            "id": "targeted",
+            "label": "Tag and seal one representative sample",
+            "minutes": 8,
+            "effects": {
+              "science": 60
+            },
+            "explanation": "A focused observation records location and conserves EVA time."
+          },
+          {
+            "id": "extended",
+            "label": "Run the full instrument survey",
+            "minutes": 16,
+            "effects": {
+              "science": 75,
+              "fatigue": 10,
+              "suitEnergy": -25
+            },
+            "explanation": "More science costs time, battery, and crew energy."
+          },
+          {
+            "id": "abort",
+            "label": "Photograph the site and return early",
+            "minutes": 2,
+            "effects": {
+              "science": 15
+            },
+            "explanation": "The crew uses fewer reserves, but the science goal may remain unmet."
+          }
+        ],
+        "hazard": null
+      },
+      {
+        "id": "return",
+        "title": "Return, stow the sample, and secure Haven",
+        "location": "base",
+        "task": "stow",
+        "description": "Return to the white Haven marker. Stow the sample and select the operating plan that must last until resupply.",
+        "options": [
+          {
+            "id": "sustain",
+            "label": "Turn off extra loads; replenish the suit",
+            "minutes": 8,
+            "effects": {
+              "foodKw": 0.6,
+              "commsKw": 0.5,
+              "shieldKw": 0,
+              "shield": "passive",
+              "fatigue": -15,
+              "health": 4,
+              "dust": 0.22,
+              "oxygen": -0.5,
+              "energy": -0.02,
+              "suitOxygen": 30,
+              "suitEnergy": 20
+            },
+            "explanation": "Essential loads and passive protection preserve the remaining resources. Transfer 30 nominal oxygen minutes and 20 Wh from Haven to the suit."
+          },
+          {
+            "id": "science",
+            "label": "Use the experimental powered shield",
+            "minutes": 4,
+            "effects": {
+              "foodKw": 3.5,
+              "shieldKw": 3,
+              "shield": "active",
+              "science": 10
+            },
+            "explanation": "An experimental teaching concept: uses extra power to reduce modelled exposure. This is not flight-ready protection; passive shelter is the established strategy in this exercise."
+          },
+          {
+            "id": "generator",
+            "label": "Spend the emergency fuel on the backup generator",
+            "minutes": 6,
+            "effects": {
+              "backupKw": 2,
+              "fuel": -8,
+              "fatigue": -8
+            },
+            "explanation": "The backup adds 2 kW but consumes the finite emergency reserve."
+          }
+        ],
+        "hazard": null
+      }
+    ]
+  }
+}

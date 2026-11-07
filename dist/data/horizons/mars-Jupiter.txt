@@ -1,0 +1,182 @@
+*******************************************************************************
+ Revised: April 12, 2021               Jupiter                              599
+ 
+ PHYSICAL DATA (revised 2025-Jan-30):
+  Mass x 10^26 (kg)     = 18.9819           Density (g/cm^3)  = 1.3262 +- .0003
+  Equat. radius (1 bar) = 71492+-4 km       Polar radius (km)     = 66854+-10
+  Vol. Mean Radius (km) = 69911+-6          Flattening            = 0.06487
+  Geometric Albedo      = 0.52              Rocky core mass (Mc/M)= 0.0261
+  Sid. rot. period (III)= 9h 55m 29.711 s   Sid. rot. rate (rad/s)= 0.00017585
+  Mean solar day, hrs   = ~9.9259         
+  GM (km^3/s^2)         = 126686531.900     GM 1-sigma (km^3/s^2) =  +- 1.2732
+  Equ. grav, ge (m/s^2) = 24.79             Pol. grav, gp (m/s^2) =  28.34
+  Vis. magnitude V(1,0) = -9.40
+  Vis. mag. (opposition)= -2.70             Obliquity to orbit    =  3.13 deg
+  Sidereal orbit period = 11.861982204 y    Sidereal orbit period = 4332.589 d
+  Mean daily motion     = 0.0831294 deg/d   Mean orbit speed, km/s= 13.0697
+  Atmos. temp. (1 bar)  = 165+-5 K          Escape speed, km/s    =  59.5           
+  A_roche(ice)/Rp       =  2.76             Hill's sphere rad. Rp = 740
+                                 Perihelion   Aphelion     Mean
+  Solar Constant (W/m^2)         56           46           51
+  Maximum Planetary IR (W/m^2)   13.7         13.4         13.6
+  Minimum Planetary IR (W/m^2)   13.7         13.4         13.6
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Mon Oct  5 14:10:24 2026 Pasadena, USA      / Horizons    
+*******************************************************************************
+Target body name: Jupiter (599)                   {source: jup365_merged}
+Center body name: Mars (499)                      {source: mar099}
+Center-site name: (user defined site below)
+*******************************************************************************
+Start time      : A.D. 2026-Oct-04 00:00:00.0000 UT      
+Stop  time      : A.D. 2026-Oct-05 00:00:00.0000 UT      
+Step-size       : 60 minutes
+*******************************************************************************
+Target pole/equ : IAU_JUPITER                     {West-longitude positive}
+Target radii    : 71492.0, 71492.0, 66854.0 km    {Equator_a, b, pole_c}       
+Center geodetic : 282.55, 18.44, -2.6             {W-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 282.55, 3221.24098, 1061.44622  {W-lon(deg),Dxy(km),Dz(km)}
+Center pole/equ : IAU_MARS                        {West-longitude positive}
+Center radii    : 3396.19, 3396.19, 3376.2 km     {Equator_a, b, pole_c}       
+Target primary  : Sun
+Vis. interferer : None
+Rel. light bend : Sun                             {source: jup365_merged}
+Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+Atmos refraction: NO (AIRLESS)
+RA format       : DEG
+Time format     : CAL 
+Calendar mode   : Mixed Julian/Gregorian
+EOP file        : eop.261002.p261229                                           
+EOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-02. PREDICTS-> 2026-DEC-28
+Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass     n.a.    , Daylight (NO )
+Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+Table format    : Comma Separated Values (spreadsheet)
+*******************************************************************************************
+ Date__(UT)__HR:MN, , ,Azi_(a-app), Elev_(a-app),  Ang-diam,             delta,     deldot,
+*******************************************************************************************
+$$SOE
+ 2026-Oct-04 00:00, , , 106.789277,   -29.673672,  45.47043,  6.4860974774E+08,-17.6203409,
+ 2026-Oct-04 01:00, , , 109.583189,   -16.493018,  45.47488,  6.4854628865E+08,-17.6329877,
+ 2026-Oct-04 02:00, , , 113.328534,    -3.579776,  45.47934,  6.4848280789E+08,-17.6322740,
+ 2026-Oct-04 03:00, , , 118.258415,     8.915658,  45.48379,  6.4841935418E+08,-17.6180043,
+ 2026-Oct-04 04:00, , , 124.836400,    20.749202,  45.48823,  6.4835597534E+08,-17.5908607,
+ 2026-Oct-04 05:00, , , 133.815647,    31.503373,  45.49267,  6.4829271523E+08,-17.5523583,
+ 2026-Oct-04 06:00, , , 146.220423,    40.458408,  45.49710,  6.4822961090E+08,-17.5047478,
+ 2026-Oct-04 07:00, , , 162.812570,    46.480285,  45.50152,  6.4816669017E+08,-17.4508687,
+ 2026-Oct-04 08:00, , , 182.519717,    48.274008,  45.50592,  6.4810396986E+08,-17.3939663,
+ 2026-Oct-04 09:00, , , 201.713052,    45.326091,  45.51031,  6.4804145468E+08,-17.3374808,
+ 2026-Oct-04 10:00, , , 217.253856,    38.445375,  45.51469,  6.4797913696E+08,-17.2848245,
+ 2026-Oct-04 11:00,*, , 228.702929,    28.951439,  45.51905,  6.4791699710E+08,-17.2391615,
+ 2026-Oct-04 12:00,*, , 236.994202,    17.874720,  45.52341,  6.4785500488E+08,-17.2032017,
+ 2026-Oct-04 13:00,*, , 243.102135,     5.845395,  45.52776,  6.4779312143E+08,-17.1790265,
+ 2026-Oct-04 14:00,*, , 247.702173,    -6.772495,  45.53210,  6.4773130169E+08,-17.1679531,
+ 2026-Oct-04 15:00,*, , 251.195722,   -19.764017,  45.53645,  6.4766949740E+08,-17.1704496,
+ 2026-Oct-04 16:00,*, , 253.762138,   -32.994189,  45.54079,  6.4760766018E+08,-17.1861049,
+ 2026-Oct-04 17:00,*, , 255.328162,   -46.367648,  45.54515,  6.4754574469E+08,-17.2136552,
+ 2026-Oct-04 18:00,*, , 255.266972,   -59.794468,  45.54951,  6.4748371155E+08,-17.2510659,
+ 2026-Oct-04 19:00,*, , 250.495108,   -73.095612,  45.55389,  6.4742152993E+08,-17.2956637,
+ 2026-Oct-04 20:00,*, , 207.522275,   -84.552609,  45.55827,  6.4735917947E+08,-17.3443093,
+ 2026-Oct-04 21:00,*, , 115.462484,   -77.904133,  45.56268,  6.4729665169E+08,-17.3936015,
+ 2026-Oct-04 22:00,*, , 105.591020,   -64.807194,  45.56709,  6.4723395047E+08,-17.4400971,
+ 2026-Oct-04 23:00, , , 104.437027,   -51.393736,  45.57151,  6.4717109185E+08,-17.4805340,
+ 2026-Oct-05 00:00, , , 105.521176,   -37.988730,  45.57595,  6.4710810294E+08,-17.5120424,
+$$EOE
+*******************************************************************************************
+Column meaning:
+ 
+TIME
+
+  Times PRIOR to 1962 are UT1, a mean-solar time closely related to the
+prior but now-deprecated GMT. Times AFTER 1962 are in UTC, the current
+civil or "wall-clock" time-scale. UTC is kept within 0.9 seconds of UT1
+using integer leap-seconds for 1972 and later years.
+
+  Conversion from the internal Barycentric Dynamical Time (TDB) of solar
+system dynamics to the non-uniform civil UT time-scale requested for output
+has not been determined for UTC times after the next July or January 1st.
+Therefore, the last known leap-second is used as a constant over future
+intervals.
+
+  Time tags refer to the UT time-scale conversion from TDB on Earth
+regardless of observer location within the solar system, although clock
+rates may differ due to the local gravity field and no analog to "UT"
+may be defined for that location.
+
+  Any 'b' symbol in the 1st-column denotes a B.C. date. First-column blank
+(" ") denotes an A.D. date.
+ 
+CALENDAR SYSTEM
+
+  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+are in the Julian calendar system, which is automatically extended for dates
+prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+matching historical dates. The Gregorian calendar more accurately corresponds
+to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+available if such physical events are the primary interest.
+
+  NOTE: "n.a." in output means quantity "not available" at the print-time.
+ 
+SOLAR PRESENCE (OBSERVING SITE)
+  Time tag is followed by a blank, then a solar-presence symbol:
+
+       '*'  Daylight (solar upper-limb on or above apparent horizon)
+       ' '  Night OR body-centered ephemeris
+
+INTERFERING BODY PRESENCE (OBSERVING SITE)
+  The solar-presence symbol is immediately followed by an "interfering body"
+presence symbol.
+
+       'i'  Upper-limb of interfering body on or above apparent horizon
+       ' '  Upper-limb of interfering body below apparent horizon OR body
+              centered ephemeris.
+
+  An "interfering body" is the largest other body in the immediate
+planet/satellite system, potentially compromising visual observations due to
+its brightness. Any such body is identified in the print-out header.
+ 
+ 'Azi_(a-app), Elev_(a-app),' =
+  Airless apparent azimuth and elevation of target center. Compensated
+for light-time, the gravitational deflection of light, stellar aberration,
+precession and nutation. Azimuth is measured clockwise from north:
+
+  North(0) -> East(90) -> South(180) -> West(270) -> North (360)
+
+Elevation angle is with respect to a plane perpendicular to the reference
+surface local zenith direction. TOPOCENTRIC ONLY.  Units: DEGREES
+ 
+ 'Ang-diam,' =
+   The equatorial angular width of the target body full disk, if it were fully
+illuminated and visible to the observer. If the target body diameter is unknown
+"n.a." is output.
+
+   Units: ARCSECONDS
+ 
+ 'delta,     deldot,' =
+   Apparent range ("delta", light-time aberrated) and range-rate ("delta-dot")
+of the target center relative to the observer. A positive "deldot" means the
+target center is moving away from the observer, negative indicates movement
+toward the observer.  Units: KM and KM/S
+
+Computations by ...
+
+    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+    4800 Oak Grove Drive, Jet Propulsion Laboratory
+    Pasadena, CA  91109   USA
+
+    General site: https://ssd.jpl.nasa.gov/
+    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+                  command-line   telnet ssd.jpl.nasa.gov 6775
+                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+    Inquiries   : Jon.D.Giorgini@jpl.nasa.gov
+
+*******************************************************************************************
