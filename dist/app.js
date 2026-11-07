@@ -254,7 +254,7 @@ function setStoryPresentation(active) {
 function openStory() {
   if(!story.start())return;
   keys.clear();setStoryPresentation(true);
-  openDialog($('story-dialog')); audio.activate(); updateStoryCaption();
+  openDialog($('story-dialog'));audio.activate();updateStoryCaption(); // Starts at once; music joins when the browser allows it.
 }
 function updateStoryCaption() {
   const chapter=story.chapter;
@@ -269,6 +269,31 @@ function updateStoryCaption() {
 // Browsers keep audio suspended until the player clicks, so check that sound is really running.
 function storyMusicPlaying() {
   return audio.settings.musicOn && !audio.muted && audio.context?.state === 'running';
+}
+// Mid-cruise fault card: diagram state, choice preview and an 8-second repair sequence after the player confirms.
+let flightEventPreview=null;
+const REPAIR_SECONDS=8;
+function syncFlightEvent(p) {
+  const card=$('flight-event'),ev=flight.flightEvent,since=ev.resolved?flight.elapsed-(ev.at??flight.elapsed):0;
+  card.hidden=p!=='transfer'||(ev.resolved&&since>=REPAIR_SECONDS);
+  if(card.hidden)return;
+  $('flight-instruction').hidden=true; // never stack the instruction card behind the decision
+  const state=ev.resolved?ev.choice:flightEventPreview?'preview-'+flightEventPreview:'fault';
+  if(card.dataset.state!==state)card.dataset.state=state;
+  $('flight-event-choices').hidden=ev.resolved;
+  const isolate=ev.choice==='isolate',restored=ev.resolved&&since>=(isolate?1.6:1.5);
+  $('flight-event-eyebrow').textContent=ev.resolved?'ASTRA / REPAIR IN PROGRESS':'ASTRA / MID-CRUISE DECISION';
+  $('flight-event-title').textContent=!ev.resolved?'Auxiliary bus fault':restored?'Auxiliary bus restored':isolate?'Isolating the nonessential circuit…':'Switching to backup power…';
+  $('flight-event-readout').textContent=ev.resolved
+    ?(isolate?'The breaker cuts the faulty auxiliary bus off from the downlink. Main power stays clean; data downlink drops to 50% for the rest of the flight.':'The backup battery takes the auxiliary load while the fault clears. Every circuit stays on; this costs 3% flight fuel and 3 emergency units after landing.')
+    :'Choose a response to the fictional auxiliary-bus fault. Hover or focus a choice to preview it on the circuit.';
+  $('flight-event-status').textContent=!ev.resolved
+    ?(flightEventPreview==='isolate'?'Preview: breaker opens · downlink 50% · no fuel cost':flightEventPreview==='backup'?'Preview: battery feeds the aux bus · −3% fuel':'Fault: auxiliary bus arcing · main bus unstable')
+    :restored?(isolate?'✓ Main bus stable · downlink 50%':'✓ All circuits on · downlink 100% · fuel −3%'):(isolate?(since<.7?'Opening breaker…':'Circuit cut off · stabilising main bus…'):(since<1?'Battery online · taking aux load…':'Fault cleared · stabilising…'));
+  const cutOff=isolate?since>=.8:flightEventPreview==='isolate'&&!ev.resolved;
+  $('bus-aux-state').textContent=!ev.resolved||since<(isolate?.8:1)?'FAULT':restored?'STABLE':isolate?'ISOLATED':'ON BATTERY';
+  $('bus-down-state').textContent=cutOff||(ev.resolved&&isolate)&&since>=.5?'50%':'100%';
+  card.setAttribute('aria-label',$('flight-event-title').textContent);
 }
 function finishStory(skipped=false) {
   story.finish(skipped);$('story-dialog').close();syncFlight();
@@ -606,7 +631,7 @@ function syncFlight(){
   const departureStamp=astro?new Date(flight.departureUTC*1000).toISOString().slice(0,16).replace('T',' ')+' UTC':flight.plan.epoch.replace('T',' ');
   $('journey-distance-basis').textContent='Centre separation: '+km(flight.plan.separationKm)+' km. Departure '+departureStamp+'. Planned route + ascent: '+(flight.plan.durationSeconds/86400).toFixed(flight.localSortie?2:0)+' days.'+(astro&&!flight.localSortie?' Daylight arrival window.':'')+' Earth g 9.80 m/s².';
   for(const w of ['moon','mars'])$('destination-'+w).setAttribute('aria-pressed',String(w===flight.destination));
-  if(astro){for(const mode of ['expedition','training'])$('mode-'+mode).setAttribute('aria-pressed',String(mode===gameMode));$('flight-skip').hidden=!['boarding','ascent','transfer','capture'].includes(p);$('flight-skip').disabled=p==='transfer'&&!flight.flightEvent.resolved;$('flight-event').hidden=p!=='transfer'||flight.flightEvent.resolved;$('flight-event-readout').textContent='Choose a response to the fictional auxiliary-bus fault. Isolating the nonessential circuit reduces flight downlink to 50%; backup power uses 3% flight fuel and 3 emergency units after landing.';$('continue-surface').hidden=surfaceResumeStatus===null&&!savedSelectedMission();$('continue-surface').textContent=surfaceResumeStatus===null?'Resume outpost checkpoint →':'Continue surface mission →';}
+  if(astro){for(const mode of ['expedition','training'])$('mode-'+mode).setAttribute('aria-pressed',String(mode===gameMode));$('flight-skip').hidden=!['boarding','ascent','transfer','capture'].includes(p);$('flight-skip').disabled=p==='transfer'&&!flight.flightEvent.resolved;syncFlightEvent(p);$('continue-surface').hidden=surfaceResumeStatus===null&&!savedSelectedMission();$('continue-surface').textContent=surfaceResumeStatus===null?'Resume outpost checkpoint →':'Continue surface mission →';}
   const copy={briefing:['Choose your destination.','Earth launch site · drag to orbit through 360°','Select Moon or Mars.','Then board Odyssey. Your destination and calculated distance are loaded into the cockpit.'],boarding:['Welcome aboard Odyssey.','Earth → '+name+' · access gantry · drag to look around','The cadet is boarding.','Watch the astronaut enter the command capsule. Systems check automatically, then you press the physical LAUNCH switch.'],cockpit:['You have the controls.','Earth → '+name+' · cabin secure · navigation loaded','Press the amber LAUNCH switch.','Click the physical switch on the console, press E, or use the button below. The cadet reaches forward to activate it. Drag to look around the cockpit.'],ignition:['Ignition sequence.','Earth → '+name+' · restraints locked','Launch switch engaged.','The engine starts after the astronaut presses the button. Keep an eye on cabin pressure and ascent velocity.'],ascent:['Leaving Earth.','Earth → '+name+' · powered ascent','Odyssey is climbing.','Velocity, acceleration, outside pressure and local gravity follow the ascent model. The animation advances automatically.'],transfer:['Destination: '+name+'.','Earth → '+name+' · transfer cruise','The journey is underway.','Coasting in space. The simulated mission clock runs faster here. Cabin temperature stays controlled while hull temperature follows the teaching model.'],capture:['Prepare for landing.','Arrival at '+name+' · g '+WORLDS[flight.destination].gravity+' m/s²','Two controls are coming up.','First lock descent velocity in the green 1–3 m/s zone with Space. Then lock attitude within ±5°. A go-around lets you retry an unsafe solution.'],speed:['Take command of the landing.','Final approach to '+name,'Lock descent velocity.',''],angle:['Set the landing attitude.','Final approach to '+name,'Lock the angle.',''],descent:['Retrorockets engaged.','Controlled descent to '+name,'Landing.',''], 'go-around':['Go-around commanded.','Your crew is safe · try the landing again','Adjust your parameters.',''],landed:['Welcome to '+name+'.','Touchdown confirmed · cabin pressure stable','Your surface training awaits.','Step outside to explore '+(flight.destination==='mars'?'Jezero’s rust-coloured terrain':'Mare Tranquillitatis')+', inspect the sky and '+(gameMode==='expedition'?'operate Haven in seven linked stages':'complete ten practical lessons')+'. Drag for a 360° view; F switches to astronaut vision.']}[p];
   if(flight.localSortie){copy[0]=copy[0].replace('Earth',name);copy[1]=name+' → orbital practice → '+name;copy[3]=copy[3].replace('Earth',name);$('journey-distance').textContent=name+' orbital practice · '+km(t.totalKm)+' km illustrative path';$('journey-distance-basis').textContent='400 km training orbit; period '+(flight.plan.durationSeconds/60).toFixed(1)+' min derived from gravity and radius. '+flight.plan.classification;}if(p==='ignition')copy[2]='Countdown · T−'+Math.max(0,3-Math.floor(flight.elapsed/2.4*3));
   $('flight-title').textContent=copy[0];$('flight-caption').textContent=copy[1];$('flight-action-title').textContent=copy[2];$('flight-action-text').textContent=copy[3];
@@ -962,7 +987,9 @@ function setupExpeditionEvents(){
  $('solar-overview').addEventListener('click',()=>{flightRenderer.probeBody=null;$('solar-labels').hidden=false;$('solar-science-readout').textContent='Navigation map: r(AU)^0.42 × 65 scene units; planet radii enlarged; Moon spacing enlarged. All positions and the partial cached orbit arcs derive from the shared UTC world.';});
  $('solar-clock').addEventListener('click',()=>{toggleScientificSky(true);});
  $('flight-skip').addEventListener('click',()=>{if(flight.skipSegment())syncFlight();});
- for(const choice of ['isolate','backup'])$('flight-choice-'+choice).addEventListener('click',()=>{if(flight.resolveEvent(choice)){audio.cue('ready');syncFlight();}});
+ for(const choice of ['isolate','backup']){const button=$('flight-choice-'+choice),preview=on=>{flightEventPreview=on?choice:null;syncFlightEvent(flight.phase);};
+   button.addEventListener('click',()=>{if(flight.resolveEvent(choice)){flightEventPreview=null;audio.cue('ready');syncFlight();}});
+   button.addEventListener('pointerenter',()=>preview(true));button.addEventListener('pointerleave',()=>preview(false));button.addEventListener('focus',()=>preview(true));button.addEventListener('blur',()=>preview(false));}
  for(const q of ['Can I safely complete this EVA?','What is our biggest risk right now?','Why did our power decrease?','What happens if I activate shielding?','Which system should I repair first?','Can the crew survive until resupply?']){const button=document.createElement('button');button.textContent=q;button.addEventListener('click',()=>askAstra(q));$('astra-card').querySelector('.astra-prompts').append(button);}
 }
 

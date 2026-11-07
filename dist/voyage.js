@@ -56,7 +56,7 @@ export class FlightSimulation{
    this.enter(safe?'descent':'go-around');return true;
   }return false;
  }
- resolveEvent(choice){if(this.phase!=='transfer'||!['isolate','backup'].includes(choice)||this.flightEvent.resolved)return false;this.flightEvent={resolved:true,choice};return true;}
+ resolveEvent(choice){if(this.phase!=='transfer'||!['isolate','backup'].includes(choice)||this.flightEvent.resolved)return false;this.flightEvent={resolved:true,choice,at:this.elapsed};return true;} 
  skipSegment(){const next={boarding:'cockpit',ascent:'transfer',transfer:'capture',capture:'speed'}[this.phase];if(!next)return false;if(this.phase==='transfer'&&!this.flightEvent.resolved)return false;if(this.phase==='ascent')this.simSeconds=600;if(this.phase==='transfer'){this.simSeconds=600+this.plan.durationSeconds;this.routeProgress=1;}if(this.phase==='capture')this.simSeconds=800+this.plan.durationSeconds;this.enter(next);return true;}
  observerState(){
   if(!this.world)return null;const a=this.world,p=this.phase,w=WORLDS[this.destination],t=this.telemetry(),utc=a.utc,frame=[vec(1,0,0),vec(0,1,0),vec(0,0,1)];let position;

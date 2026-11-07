@@ -307,3 +307,50 @@ body.in-story #world{position:absolute;inset:0;width:100%;height:100%;border-rad
 .boot-cover .story-brand{display:block}
 .boot-cover p{font-size:15px;margin:0}
 .boot-cover small{max-width:420px;font-size:12px;color:#c0b6aa}
+/* Mid-cruise fault: circuit diagram, choice previews and the repair sequence. */
+.bus-diagram{display:block;width:100%;height:auto;margin:4px 0 2px;overflow:visible;font-family:inherit}
+.bus-diagram .node rect{fill:#0b1a22;stroke:#5d7f86;stroke-width:1.4;transition:fill .4s,stroke .4s,opacity .4s}
+.bus-diagram text{fill:#e7f0ee;font-size:9px;font-weight:700;letter-spacing:.06em;text-anchor:middle}
+.bus-diagram text.sub{font-size:7.5px;font-weight:400;fill:#a8bcb8;letter-spacing:.02em}
+.bus-diagram .wire{fill:none;stroke:#ffb347;stroke-width:3;stroke-linecap:round;transition:stroke .4s,opacity .4s}
+.bus-diagram .w-batt{stroke:#4a5b61;stroke-dasharray:4 5}
+.bus-diagram .breaker circle{fill:#e7f0ee}
+.bus-diagram .breaker-lever{stroke:#ffb347;stroke-width:3;stroke-linecap:round;transform-origin:218px 38px;transition:transform .5s ease,stroke .4s}
+.bus-diagram .bolt{fill:#ff5a4a;transform-origin:186px 24px}
+.bus-diagram .tag{font-size:8px;font-weight:600;opacity:0;transition:opacity .4s}
+.bus-diagram .tag-cut{fill:#ffb347}.bus-diagram .tag-ok{fill:#5fe0a0}
+.flight-event[data-state="fault"] .n-aux rect,.flight-event[data-state^="preview"] .n-aux rect{stroke:#ff5a4a;fill:#2a1416}
+.flight-event[data-state="fault"] .bolt,.flight-event[data-state^="preview"] .bolt{animation:bus-blink .7s steps(2,start) infinite}
+.flight-event[data-state="fault"] .w-main,.flight-event[data-state^="preview"] .w-main{stroke-dasharray:6 6;animation:bus-flow .6s linear infinite}
+.flight-event[data-state="preview-isolate"] .breaker-lever{transform:rotate(-34deg)}
+.flight-event[data-state="preview-isolate"] .w-down,.flight-event[data-state="preview-isolate"] .n-down rect{opacity:.4}
+.flight-event[data-state="preview-isolate"] .tag-cut{opacity:1}
+.flight-event[data-state="preview-backup"] .w-batt{stroke:#ffb347;stroke-dasharray:6 5;animation:bus-flow-up .5s linear infinite}
+.flight-event[data-state="preview-backup"] .n-batt rect{stroke:#ffb347;fill:#2b2010}
+/* Repair sequences (0 s = the moment you confirm). */
+.flight-event[data-state="isolate"] .breaker-lever{animation:breaker-open .6s ease forwards}
+.flight-event[data-state="isolate"] .bolt{animation:bus-blink .25s steps(2,start) 3,fade-out .3s .7s forwards}
+.flight-event[data-state="isolate"] .w-down,.flight-event[data-state="isolate"] .n-down rect{animation:dim .4s .5s forwards}
+.flight-event[data-state="isolate"] .tag-cut{animation:show .3s .5s forwards}
+.flight-event[data-state="isolate"] .w-main{animation:go-green .5s 1.4s forwards}
+.flight-event[data-state="isolate"] .n-aux rect,.flight-event[data-state="isolate"] .n-main rect{stroke:#ff5a4a;animation:node-green .5s 1.6s forwards}
+.flight-event[data-state="isolate"] .tag-ok{animation:show .3s 1.9s forwards}
+.flight-event[data-state="backup"] .w-batt{stroke:#ffb347;stroke-dasharray:6 5;animation:bus-flow-up .5s linear 3,go-green .5s 1.3s forwards}
+.flight-event[data-state="backup"] .n-batt rect{stroke:#ffb347;fill:#2b2010}
+.flight-event[data-state="backup"] .bolt{animation:bus-blink .25s steps(2,start) 4,fade-out .3s .9s forwards}
+.flight-event[data-state="backup"] .w-main,.flight-event[data-state="backup"] .w-down{animation:go-green .5s 1.3s forwards}
+.flight-event[data-state="backup"] .n-aux rect,.flight-event[data-state="backup"] .n-main rect,.flight-event[data-state="backup"] .n-down rect{stroke:#ff5a4a;animation:node-green .5s 1.5s forwards}
+.flight-event[data-state="backup"] .tag-ok{animation:show .3s 1.8s forwards}
+.flight-event[data-state="backup"] .breaker-lever{animation:go-green .5s 1.3s forwards}
+.flight-event-status{min-height:1.4em;margin:2px 0 0;font-family:var(--mono);font-size:11px!important;color:#9fe3c2!important}
+.flight-event[data-state="fault"] .flight-event-status,.flight-event[data-state^="preview"] .flight-event-status{color:#ffc999!important}
+@keyframes bus-blink{to{visibility:hidden}}
+@keyframes bus-flow{to{stroke-dashoffset:-12}}
+@keyframes bus-flow-up{to{stroke-dashoffset:11}}
+@keyframes breaker-open{to{transform:rotate(-34deg)}}
+@keyframes fade-out{to{opacity:0}}
+@keyframes dim{to{opacity:.35}}
+@keyframes show{to{opacity:1}}
+@keyframes go-green{to{stroke:#45d483;stroke-dasharray:none}}
+@keyframes node-green{to{stroke:#45d483;fill:#0f2a1f}}
+@media (prefers-reduced-motion:reduce){.bus-diagram *{animation-duration:.01s!important;animation-delay:0s!important;animation-iteration-count:1!important}}
