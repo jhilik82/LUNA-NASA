@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="luna-build" content="1.3.2">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#132127">
   <meta name="description" content="Launch from Earth, land on the Moon or Mars, and train as a junior astronaut in two ten-mission campaigns. Practise EVA, repair, power, sample handling, antenna pointing and rover deliveries with ASTRA guidance.">
   <title>LUNA + ASTRA — Mission Trainer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23132127'/%3E%3Cpath d='M42 12a22 22 0 1 0 10 36A23 23 0 0 1 42 12' fill='%23f3e8cc'/%3E%3Ccircle cx='46' cy='18' r='4' fill='%23ff915d'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=1.3.1-merged">
+  <link rel="stylesheet" href="styles.css?v=1.3.2-merged">
 </head>
 <body>
   <div class="boot-cover" id="loading" role="status" aria-label="Loading LUNA"><span class="story-brand">LUNA<span>BEYOND THE LIFELINE</span></span></div>
@@ -101,11 +102,11 @@
       <div class="location-card" id="location-card">
         <div class="location-top"><span class="status-dot"></span><span id="actor-mode">ASTRONAUT / EVA</span><span class="location-id">A-01</span></div>
         <div class="coordinates"><span id="latitude">—</span><span class="coord-divider">/</span><span id="longitude">—</span></div>
-        <div class="surface-environment" id="surface-environment">MOON · g 1.62 m/s² · vacuum</div><div class="location-bottom"><span id="elevation">— m</span><span id="distance-travelled">0.00 km travelled</span></div>
+        <div class="surface-environment" id="surface-environment">MOON · g 1.62 m/s² · vacuum</div><div class="surface-weather" id="surface-weather" role="status" aria-live="polite" hidden><span id="surface-weather-icon" aria-hidden="true"></span><strong id="surface-weather-label"></strong><small id="surface-weather-note"></small></div><div class="location-bottom"><span id="elevation">— m</span><span id="distance-travelled">0.00 km travelled</span></div>
       </div>
       <div class="interaction-prompt" id="interaction-prompt" hidden><button id="interact-button"><kbd>E</kbd><span id="interact-label">Interact</span><span aria-hidden="true">↗</span></button></div>
       <div class="mission-notice" id="notice" role="status" hidden></div>
-      <div class="paused-banner" id="paused-banner" hidden><span>EXPEDITION PAUSED</span><button id="resume-button">Resume <span aria-hidden="true">→</span></button></div>
+      <div class="weather-chip" id="weather-chip" hidden role="status" aria-live="polite"><span class="weather-icon" id="weather-icon" aria-hidden="true"></span><span><strong id="weather-label">Weather</strong><small id="weather-note"></small></span></div><div class="paused-banner" id="paused-banner" hidden><span>EXPEDITION PAUSED</span><button id="resume-button">Resume <span aria-hidden="true">→</span></button></div>
       <div class="touch-controls" id="touch-controls" aria-label="Touch movement controls">
         <div class="d-pad"><button data-direction="up" aria-label="Move up">↑</button><button data-direction="left" aria-label="Move left">←</button><button data-direction="down" aria-label="Move down">↓</button><button data-direction="right" aria-label="Move right">→</button></div>
         <button class="touch-action" id="touch-interact">E <span>ACT</span></button>
@@ -182,7 +183,9 @@
     <div class="circuit-design" id="circuit-design"></div>
     <div class="circuit-frame" id="circuit-frame"><div class="circuit-input" id="circuit-input"><span class="circuit-indicator"></span><span>INPUT</span></div><div class="circuit-grid" id="circuit-grid" aria-label="Rotatable circuit tiles"></div><div class="circuit-output" id="circuit-output"><span class="circuit-indicator" id="output-indicator"></span><span>OUTPUT</span></div></div>
     <div class="repair-feedback"><span id="circuit-feedback">Signal not connected</span><span id="circuit-moves">0 rotations</span></div>
-    <div class="repair-hint"><kbd>↻</kbd> Click a tile to rotate it 90°. Mission time is paused.</div>
+    <div class="puzzle-timer" id="puzzle-timer" data-level="ok" role="timer" aria-live="off"><div class="puzzle-timer-row"><span class="eyebrow">TIME LIMIT</span><strong id="puzzle-time">1:00</strong></div><div class="puzzle-timer-bar"><i id="puzzle-timer-fill"></i></div><p id="puzzle-timer-note">Finish before the bus trips, or the wires scramble and the clock restarts.</p></div>
+    <label class="puzzle-oxygen" for="puzzle-oxygen"><input type="checkbox" id="puzzle-oxygen"><span>Use more oxygen to solve the puzzle</span><b id="puzzle-oxygen-level">O₂ 100%</b></label>
+    <div class="repair-hint"><kbd>↻</kbd> Click a tile to rotate it 90°. Mission time is paused; the repair clock is not.</div>
     <button class="primary-button" id="apply-repair" disabled>Apply repair <span aria-hidden="true">→</span></button>
     </div>
   </dialog>
@@ -200,6 +203,7 @@
     <div class="debrief-emblem" id="debrief-emblem" aria-hidden="true">✦</div><h2 id="debrief-title">Echo is home<span>.</span></h2><p id="debrief-description">You restored the signal and returned the rover to Haven.</p>
     <div class="debrief-rank" id="debrief-rank">MISSION SPECIALIST</div>
     <div class="debrief-metrics" id="debrief-metrics"></div><div class="debrief-learning" id="debrief-learning"></div>
+    <section class="recap-quiz" id="recap-quiz" hidden aria-labelledby="recap-title"><div class="eyebrow">MISSION RECAP QUIZ</div><h3 id="recap-title">Mission recap</h3><p class="recap-intro">Quick check on what just happened. Pick one answer per question.</p><ol id="recap-questions"></ol><p id="recap-score" role="status"></p></section>
     <div class="dialog-actions"><button class="primary-button" id="next-level-button" hidden>Continue to next level →</button><button class="secondary-button" id="replay-button">Retry level ↻</button><button class="secondary-button" id="restart-button">Restart level</button></div>
     <div class="skill-check" id="skill-check" hidden><div class="eyebrow">OPTIONAL KNOWLEDGE CHECK · +100 XP</div><h3 id="review-question"></h3><div id="review-answers"></div><p id="review-feedback" role="status"></p></div>
     <div class="course-certificate" id="course-certificate" hidden></div>
@@ -239,7 +243,7 @@
       <button class="secondary-button settings-toggle" id="tutorial-setting-toggle" aria-pressed="true">Tutorial on</button>
       <p id="tutorial-setting">Action-by-action guidance is enabled.</p>
       <button class="secondary-button" id="tutorial-restart">Show tutorial for this level ↗</button>
-      <p id="performance-readout">Frame measurements appear during play.</p><label class="astronomy-control">Graphics quality<select id="graphics-quality"><option value="low">Low · 1× pixels / 512 shadows</option><option value="balanced" selected>Balanced · 1.5× pixels / 2048 shadows</option><option value="high">High · 2× pixels / 4096 shadows</option></select></label><label class="astronomy-control"><span><input id="orbit-lines" type="checkbox" checked> Show overview orbit guides</span></label><button class="secondary-button settings-toggle" id="labels-button" aria-pressed="true">High contrast world labels on</button>
+      <p id="performance-readout">Frame measurements appear during play.</p><label class="astronomy-control">Graphics quality<select id="graphics-quality"><option value="low">Low · 1× pixels / 512 shadows</option><option value="balanced" selected>Balanced · 1.5× pixels / 2048 shadows</option><option value="high">High · 2× pixels / 4096 shadows</option></select></label><label class="astronomy-control">Weather<select id="weather-mode"><option value="auto" selected>Automatic · changes every 6 mission hours</option><option value="clear">Always calm</option><option value="windy">Always windy / active</option><option value="storm">Always stormy</option></select></label><label class="astronomy-control"><span><input id="orbit-lines" type="checkbox" checked> Show overview orbit guides</span></label><button class="secondary-button settings-toggle" id="labels-button" aria-pressed="true">High contrast world labels on</button>
       <button class="secondary-button settings-toggle" id="reset-camera">Reset camera and follow astronaut ↺</button>
       <button class="secondary-button settings-toggle" id="reset-panels">Reset tutorial and ASTRA positions ↺</button>
       <small>Music, motion, labels, tutorial preference, badges and unlocked levels are remembered in this browser when storage is available. Showing the tutorial keeps your current progress.</small>
@@ -259,6 +263,6 @@
   </dialog>
   <dialog id="consequence-dialog" class="help-dialog" aria-labelledby="consequence-title"><div class="eyebrow">YOUR DECISION / YOUR CONSEQUENCE</div><h2 id="consequence-title">Here is what changed.</h2><pre id="consequence-text"></pre><button id="consequence-next" class="primary-button">Continue</button></dialog>
 <dialog id="greenhouse-dialog" class="help-dialog" aria-labelledby="greenhouse-title"><div class="dialog-heading"><div class="eyebrow">HAVEN / GREENHOUSE</div><button data-close class="dialog-close" aria-label="Close greenhouse">×</button></div><h2 id="greenhouse-title">Growing tomorrow’s food.</h2><pre id="greenhouse-readout"></pre><p>Plants grow in an accelerated teaching cycle. Real crops take far longer. The illuminated dome and botanist show the system you are managing.</p><button id="greenhouse-route" class="primary-button">Walk to the greenhouse</button><button data-close class="secondary-button">Back to mission</button></dialog>
-<script src="game.js?v=1.3.1-merged" defer></script>
+<script src="game.js?v=1.3.2-merged" defer></script>
 </body>
 </html>

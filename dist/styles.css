@@ -250,7 +250,7 @@ body.in-story{grid-template-rows:minmax(0,1fr)}
 body.in-story>.masthead,body.in-story>.command-bar,body.in-story>.astra-launcher,body.in-story>#astra-card{display:none!important}
 body.in-story .workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);width:100%;height:100%;min-height:0}
 body.in-story .mission-panel,body.in-story .playfield>:not(#world),body.in-story #tutorial-card{display:none!important}
-body.in-story .playfield{width:100%;height:100%;min-height:0;overflow:hidden}
+body.in-story .playfield{position:fixed;inset:0;width:100%;height:100%;min-height:0;overflow:hidden;grid-row:auto;grid-column:auto;z-index:0} /* the story fills the window at every size */
 body.in-story #world{position:absolute;inset:0;width:100%;height:100%;border-radius:0;outline:none!important}
 /* Reset the earlier stacked-phone card layout inside the compact HUD. */
 .mission-panel .next-action-card{display:block;position:static;grid-column:auto;grid-row:auto;max-width:none;width:100%}
@@ -354,3 +354,86 @@ body.in-story #world{position:absolute;inset:0;width:100%;height:100%;border-rad
 @keyframes go-green{to{stroke:#45d483;stroke-dasharray:none}}
 @keyframes node-green{to{stroke:#45d483;fill:#0f2a1f}}
 @media (prefers-reduced-motion:reduce){.bus-diagram *{animation-duration:.01s!important;animation-delay:0s!important;animation-iteration-count:1!important}}
+/* Puzzle timer and the oxygen-overtime toggle. */
+.puzzle-timer{margin:10px 0 6px;padding:10px 12px;border:1px solid #2f4a52;border-radius:10px;background:#0a161c}
+.puzzle-timer-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.puzzle-timer strong{font-family:var(--mono);font-size:20px;color:#e9f6f2;font-variant-numeric:tabular-nums}
+.puzzle-timer-bar{height:6px;margin-top:8px;border-radius:99px;background:#16262d;overflow:hidden}
+.puzzle-timer-bar i{display:block;height:100%;width:100%;border-radius:inherit;background:linear-gradient(90deg,#3fd29b,#7be8db);transform-origin:left center;transition:background .3s}
+.puzzle-timer p{margin:6px 0 0;font-size:12px;color:#9fb4b1}
+.puzzle-timer[data-level="warning"]{border-color:#7a5b23}.puzzle-timer[data-level="warning"] strong{color:#ffc35a}
+.puzzle-timer[data-level="warning"] .puzzle-timer-bar i{background:linear-gradient(90deg,#ffb347,#ffd27a)}
+.puzzle-timer[data-level="danger"]{border-color:#8a2f2a;animation:timer-pulse 1s ease-in-out infinite}.puzzle-timer[data-level="danger"] strong{color:#ff6b5e}
+.puzzle-timer[data-level="danger"] .puzzle-timer-bar i{background:linear-gradient(90deg,#ff4b3e,#ff8a6b)}
+.puzzle-timer[data-level="overtime"]{border-color:#8a2f2a;background:#1d0e10}.puzzle-timer[data-level="overtime"] strong{color:#ff8a6b}
+.puzzle-timer[data-tripped]{animation:timer-trip .5s ease 2}
+.puzzle-oxygen{display:flex;align-items:center;gap:10px;margin:4px 0 8px;padding:8px 12px;border:1px solid #2f4a52;border-radius:10px;cursor:pointer;font-size:13px;color:#d9ebe7}
+.puzzle-oxygen input{width:18px;height:18px;accent-color:#3fd29b;flex:none}
+.puzzle-oxygen span{flex:1}
+.puzzle-oxygen b{font-family:var(--mono);font-size:13px;color:#7be8db;white-space:nowrap}
+.puzzle-oxygen b[data-low]{color:#ff8a6b}
+.puzzle-oxygen:has(input:checked){border-color:#3fd29b;background:#0c1f1a}
+@keyframes timer-pulse{50%{box-shadow:0 0 0 3px #ff4b3e33}}
+@keyframes timer-trip{30%{transform:translateX(-5px)}70%{transform:translateX(5px)}}
+@media (prefers-reduced-motion:reduce){.puzzle-timer,.puzzle-timer[data-tripped]{animation:none!important}}
+
+/* Mission recap quiz in the debrief. */
+.recap-quiz{text-align:left;margin:14px 0;padding:14px 16px;border:1px solid #2f4a52;border-radius:12px;background:#0a161c}
+.recap-quiz h3{margin:4px 0 2px;font-size:18px}
+.recap-intro{margin:0 0 8px;font-size:13px;color:#9fb4b1}
+.recap-quiz ol{margin:0;padding-left:20px;display:grid;gap:12px}
+.recap-quiz li p{margin:0 0 6px;font-weight:600}
+.recap-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px}
+.recap-option{padding:8px 10px;border:1px solid #35535b;border-radius:8px;background:#0f2128;color:#e6f2ef;text-align:left;font:inherit;font-size:13px;cursor:pointer}
+.recap-option:hover:not(:disabled){border-color:#7be8db}
+.recap-option:disabled{cursor:default}
+.recap-option[data-result="correct"]{border-color:#3fd29b;background:#0f2e22}
+.recap-option[data-result="wrong"]{border-color:#ff6b5e;background:#2a1214}
+.recap-explain{margin:6px 0 0;font-size:12px;color:#b9cdc9}
+#recap-score{margin:10px 0 0;font-weight:700;color:#7be8db}
+
+/* Weather condition chip (top of the play area). */
+.weather-chip{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:12;display:flex;align-items:center;gap:10px;max-width:min(460px,80vw);padding:7px 14px;border:1px solid #33515a;border-radius:999px;background:#08141acc;backdrop-filter:blur(6px);color:#e4f1ee;pointer-events:none}
+.weather-chip strong{display:block;font-size:13px;letter-spacing:.02em}
+.weather-chip small{display:block;font-size:11px;color:#a9bfbb;line-height:1.3}
+.weather-icon{font-size:18px;line-height:1}
+.weather-chip[data-severity="storm"]{border-color:#c8553d;background:#2a0f0dcc}
+.weather-chip[data-severity="radiation"]{border-color:#ff5f7a;background:#2a0b14cc;animation:radiation-pulse 1.6s ease-in-out infinite}
+@keyframes radiation-pulse{50%{box-shadow:0 0 0 4px #ff5f7a33}}
+.in-story .weather-chip{display:none}
+@media (prefers-reduced-motion:reduce){.weather-chip{animation:none!important}}
+
+/* ASTRA panel: never taller than the space under the top bar; compact on short screens (laptops, 125–150% scaling). */
+#astra-card{width:min(380px,calc(100vw - 24px));max-height:min(620px,calc(100dvh - 148px - 92px))}
+@media (max-height:820px){
+  #astra-card{bottom:96px;max-height:min(560px,calc(100dvh - 96px - 88px))}
+  #astra-card .astra-header{padding:8px 12px}
+  #astra-card .astra-drag-handle{min-height:32px}
+  #astra-card .astra-symbol{flex-basis:30px;width:30px;height:30px;font-size:22px}
+  #astra-card .astra-content{padding:12px}
+  #astra-card .astra-message{max-height:140px;padding:10px 12px;font-size:12.5px;line-height:1.6;margin-bottom:12px}
+  #astra-card .astra-prompts{gap:5px;margin-bottom:10px}
+  #astra-card .astra-prompts button{padding:6px 9px;min-height:30px}
+}
+
+/* Weather on the surface: one line in the location card (no overlap with mission cards). */
+.surface-weather{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 7px;margin:6px 0 2px;padding:5px 8px;border-radius:7px;background:#ffffff0d;font-size:11px;line-height:1.35;color:#d9ebe7}
+.surface-weather strong{font-size:11.5px}
+.surface-weather small{flex-basis:100%;color:#a9bfbb;font-size:10.5px}
+.surface-weather[data-severity="storm"]{background:#c8553d2e;box-shadow:inset 0 0 0 1px #c8553d88}
+.surface-weather[data-severity="radiation"]{background:#ff5f7a24;box-shadow:inset 0 0 0 1px #ff5f7a99;animation:radiation-pulse 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.surface-weather{animation:none!important}}
+
+/* Weather chip docked under the flight title when the top centre is crowded (narrow windows). */
+.weather-chip.docked{transform:none;max-width:min(330px,calc(100% - 24px));padding:6px 12px}
+.weather-chip.docked small{font-size:10px}
+/* Short mission notices always show above the flight HUD panels. */
+.mission-notice{z-index:16}
+
+/* Phone-width flight screens: ASTRA shrinks to its symbol and the bottom panels leave room for it,
+   so it never covers "Board the spaceship", flight choices or landing controls. */
+@media(max-width:620px){
+  body.in-flight .astra-launcher{padding:7px;min-height:42px;min-width:42px;justify-content:center;gap:0}
+  body.in-flight .astra-launcher>span:not(.astra-launcher-symbol){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  body.in-flight .destination-picker,body.in-flight .flight-instruction,body.in-flight .landing-controls,body.in-flight .flight-event{right:64px}
+}

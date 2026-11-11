@@ -1,6 +1,9 @@
 import { clamp } from './engine.js';
 import { TrainingMission } from './academy.js';
 import { Renderer } from './render-3d.js';
+import { PuzzleTimer, puzzleTimeLimit } from './puzzle-timer.js';
+import { buildRecapQuiz, scoreRecap } from './recap-quiz.js';
+import { chooseWeather, stageWeather } from './weather.js';
 import { AcademyGuide } from './academy-guide.js';
 import { MissionAudio } from './mission-audio.js';
 import { readPreference, writePreference } from './preferences.js';
@@ -14,7 +17,26 @@ import { powerBalance } from './expedition.js';
 import { createDestinationMission } from './worlds.js';
 import { loadGameData, connectLocalBackend } from './local-backend.js';
 
-const $ = id => document.getElementById(id);
+// Game code version. index.html carries the same value in <meta name="luna-build">; if they differ, the
+// browser is running a stale build next to newer files, which is reported on screen.
+const LUNA_VERSION='1.3.2';
+// Problems are shown on screen (and in the console) instead of silently breaking buttons.
+const reportedProblems=new Set();
+function reportProblem(message){
+  if(reportedProblems.has(message)||!globalThis.document?.body)return;reportedProblems.add(message);console.error('LUNA: '+message);
+  try{showProblem(message);}catch{} // the reporter itself must never throw
+}
+function showProblem(message){
+  let box=document.getElementById('luna-problem');
+  if(!box){box=document.createElement('div');box.id='luna-problem';box.setAttribute('role','alert');Object.assign(box.style,{position:'fixed',left:'50%',bottom:'18px',transform:'translateX(-50%)',zIndex:2147483001,maxWidth:'min(640px,92vw)',padding:'12px 44px 12px 16px',borderRadius:'12px',border:'1px solid #ff6b5e',background:'#2a1012f2',color:'#ffe9e6',font:'13px/1.45 system-ui,sans-serif',boxShadow:'0 10px 30px #0008'});
+    const close=document.createElement('button');close.textContent='×';close.setAttribute('aria-label','Dismiss');Object.assign(close.style,{position:'absolute',right:'8px',top:'6px',background:'none',border:0,color:'#ffe9e6',fontSize:'20px',cursor:'pointer'});close.addEventListener('click',()=>box.remove());
+    const list=document.createElement('div');list.id='luna-problem-list';box.append(list,close);document.body.append(box);}
+  const line=document.createElement('div');line.textContent='⚠ '+message;document.getElementById('luna-problem-list').append(line);
+}
+// A missing page element (for example an older index.html next to newer game code) must not stop the
+// rest of the game from working: return an inert stand-in and report the problem once.
+const inertElement=new Proxy(function(){},{get:(_,key)=>key==='classList'?{add(){},remove(){},toggle(){},contains(){return false;}}:['style','dataset'].includes(key)?{}:['hidden','open','checked','disabled'].includes(key)?false:['value','textContent','innerHTML'].includes(key)?'':key===Symbol.toPrimitive?()=>'':()=>inertElement,set:()=>true,apply:()=>inertElement});
+const $ = id => document.getElementById(id) || (reportProblem('Page element #'+id+' is missing: the page and the game code do not match. Run npm.cmd run build, then press Ctrl+F5.'),inertElement);
 const keys = new Set();
 let localSortieState=null;const performanceFrames=[];
 let astro=null,gameMode='training',graphicsQuality='balanced',explorationRenderTime=0;
@@ -248,7 +270,7 @@ function setStoryPresentation(active) {
     });
   }else if(storyChromeState){
     for(const {element,hidden,inert} of storyChromeState){element.hidden=hidden;element.inert=inert;}
-    storyChromeState=null;
+    storyChromeState=null;syncPanelLock(); // the window may have been resized during the story
   }
 }
 function openStory() {
@@ -294,6 +316,81 @@ function syncFlightEvent(p) {
   $('bus-aux-state').textContent=!ev.resolved||since<(isolate?.8:1)?'FAULT':restored?'STABLE':isolate?'ISOLATED':'ON BATTERY';
   $('bus-down-state').textContent=cutOff||(ev.resolved&&isolate)&&since>=.5?'50%':'100%';
   card.setAttribute('aria-label',$('flight-event-title').textContent);
+}
+// Repair puzzle countdown. Runs on real time while the repair dialog is open (mission time stays paused).
+let puzzleTimer=null,puzzleCircuit=null;
+function puzzleOxygenPercent(){return Math.max(0,mission.state.oxygen/mission.config.suit.oxygenMinutes*100);}
+function updatePuzzleTimer(dt){
+  const open=$('repair-dialog').open&&mission.circuit&&mission.state.status==='repair';
+  if(!open){puzzleTimer=null;puzzleCircuit=null;return;}
+  if(!puzzleTimer||puzzleCircuit!==mission.circuit){puzzleTimer=new PuzzleTimer(puzzleTimeLimit(mission.repairType,!!mission.isTraining));puzzleCircuit=mission.circuit;}
+  const useOxygen=!!$('puzzle-oxygen').checked,result=puzzleTimer.update(dt,{useOxygen,paused:document.hidden});
+  if(result.type==='reset'){
+    mission.circuit.scramble(Math.floor((mission.state.time+puzzleTimer.resets*7919)*1000)%2147483647);renderCircuit();
+    $('puzzle-timer').dataset.tripped='';setTimeout(()=>{delete $('puzzle-timer').dataset.tripped;},1000);
+    $('circuit-feedback').textContent='Time up: the bus tripped and the wires scrambled. Try again.';beep(180,.25);
+  }
+  if(result.type==='overtime'){
+    mission.spendOxygen(result.oxygenMinutes,'repair overtime');
+    if(mission.state.status==='failed'){$('repair-dialog').close();puzzleTimer=null;processEvents();updateUI();return;}
+  }
+  const level=puzzleTimer.level;$('puzzle-timer').dataset.level=level;$('puzzle-time').textContent=puzzleTimer.label();
+  $('puzzle-timer-fill').style.transform='scaleX('+puzzleTimer.fraction.toFixed(4)+')';
+  $('puzzle-timer-note').textContent=level==='overtime'?'Overtime: every second costs one minute of suit oxygen.':useOxygen?'When the clock reaches zero you keep working, paying in suit oxygen.':'Finish before the bus trips, or the wires scramble and the clock restarts.';
+  const o2=puzzleOxygenPercent();$('puzzle-oxygen-level').textContent='O₂ '+o2.toFixed(o2<10?1:0)+'%';
+  if(o2<25)$('puzzle-oxygen-level').dataset.low='';else delete $('puzzle-oxygen-level').dataset.low;
+}
+// Weather and ambience: pick the condition for the place the player is in, push it to the renderers,
+// show it on the HUD, and drive the ambient sound. Called from the frame loop (cheap).
+let weatherMode='auto',currentWeather=null,weatherClock=0,lastStrikes=0;
+function weatherPlace(){
+  if(flight?.active){const p=flight.phase;if(['transfer','capture'].includes(p))return 'space';if(['briefing','boarding','cockpit','ignition','ascent'].includes(p))return 'earth';return flight.destination==='mars'?'mars':'moon';} // landing: the destination's weather
+  return mission?.config?.world==='mars'?'mars':'moon';
+}
+function syncWeather(dt=0){
+  const place=weatherPlace(),chip=$('weather-chip');
+  if(!place||story?.active){chip.hidden=true;$('surface-weather').hidden=true;audio.setAmbience?.({},dt);return;}
+  const forced=mission?.isExpedition&&!flight?.active?stageWeather(place,mission.stage?.id):null;
+  const condition=chooseWeather(place,astro?.utc??(mission?.state?.time||0),weatherMode,forced);
+  const target=place==='earth'?flightRenderer?.padWeather:place==='space'?flightRenderer?.spaceWeather:renderer?.weather;
+  target?.setCondition(condition);
+  const severity=condition.radiation?'radiation':condition.id==='storm'?'storm':'normal',surface=(place==='moon'||place==='mars')&&!flight?.active;
+  if(condition!==currentWeather){
+    const first=!currentWeather;currentWeather=condition;
+    $('weather-icon').textContent=$('surface-weather-icon').textContent=condition.icon;$('weather-label').textContent=$('surface-weather-label').textContent=condition.label;$('weather-note').textContent=$('surface-weather-note').textContent=condition.note;
+    chip.dataset.severity=$('surface-weather').dataset.severity=severity;
+    if(!first&&severity!=='normal')notice(condition.label+': '+condition.note,'warning');
+  }
+  // In flight the chip sits at the top of the view; on the surface the weather is a line in the location card.
+  chip.hidden=surface;$('surface-weather').hidden=!surface;
+  if(!surface)placeWeatherChip(dt);
+  const indoors=flight?.active?flight.cabinFlight||['cockpit','ignition'].includes(flight.phase):false;
+  const air=place==='earth'||place==='mars',muffle=indoors?.25:1;
+  audio.setAmbience?.({wind:air?Math.min(1,(condition.wind||0)/20)*(place==='mars'?.55:1)*muffle:0,rain:(condition.rain||0)*muffle,geiger:condition.radiation?1:0},dt);
+  const strikes=flightRenderer?.padWeather?.strikes||0;if(strikes>lastStrikes&&place==='earth')audio.thunder?.(.8);lastStrikes=strikes;
+}
+// In narrow windows the top-centre weather chip would cover the flight title or instruments. Twice a second, check
+// for that and, if so, dock the chip on the left under the flight title and stage strip instead.
+let weatherChipCheck=0;
+function placeWeatherChip(dt){
+  weatherChipCheck-=dt;if(weatherChipCheck>0)return;weatherChipCheck=.5;
+  const chip=$('weather-chip'),field=document.querySelector?.('.playfield')?.getBoundingClientRect?.();
+  if(!field||!document.querySelectorAll||!chip.getBoundingClientRect)return;
+  chip.classList.remove('docked');chip.style.left=chip.style.top='';
+  const visible=e=>e&&e.getClientRects().length>0&&getComputedStyle(e).display!=='none';
+  const blockers=[...document.querySelectorAll('.flight-heading,.flight-instruments')].filter(visible),c=chip.getBoundingClientRect();
+  const covers=blockers.some(e=>{const r=e.getBoundingClientRect();return c.left<r.right&&r.left<c.right&&c.top<r.bottom&&r.top<c.bottom;});
+  if(!covers)return;
+  const above=[...document.querySelectorAll('.flight-heading,.flight-steps')].filter(visible).map(e=>e.getBoundingClientRect());
+  if(!above.length)return;
+  chip.classList.add('docked');
+  chip.style.left=Math.round(Math.min(...above.map(r=>r.left))-field.left)+'px';
+  chip.style.top=Math.round(Math.max(...above.map(r=>r.bottom))-field.top+10)+'px';
+  // On phone-width screens the instruments sit under the title too: step below anything still covered.
+  for(let i=0;i<3;i++){
+    const d=chip.getBoundingClientRect(),hit=blockers.map(e=>e.getBoundingClientRect()).find(r=>d.left<r.right&&r.left<d.right&&d.top<r.bottom&&r.top<d.bottom);
+    if(!hit)break;chip.style.top=Math.round(hit.bottom-field.top+10)+'px';
+  }
 }
 function finishStory(skipped=false) {
   story.finish(skipped);$('story-dialog').close();syncFlight();
@@ -540,6 +637,22 @@ function renderCircuit() {
   $('circuit-moves').textContent = circuit.moves + ' rotations';
   $('output-indicator').classList.toggle('connected', connected); $('apply-repair').disabled = !connected;
 }
+// Recap quiz on the gist of the mission just finished (built from this run's own events).
+function renderRecapQuiz(d){
+  const quiz=buildRecapQuiz(mission,d,{seed:Math.round(mission.state.time*13)+(d.decisions?.length||0),scenarios:pack?.scenarios}),answers=[];
+  $('recap-quiz').hidden=!quiz.questions.length;$('recap-title').textContent=quiz.title;$('recap-score').textContent='';
+  $('recap-questions').replaceChildren(...quiz.questions.map((q,qi)=>{
+    const item=document.createElement('li'),prompt=document.createElement('p'),options=document.createElement('div'),explain=document.createElement('p');
+    prompt.textContent=q.prompt;options.className='recap-options';explain.className='recap-explain';explain.hidden=true;
+    options.append(...q.options.map((text,oi)=>{const b=document.createElement('button');b.className='recap-option';b.type='button';b.textContent=text;
+      b.addEventListener('click',()=>{if(answers[qi]!==undefined)return;answers[qi]=oi;
+        for(const [k,o] of [...options.children].entries()){o.disabled=true;if(k===q.answer)o.dataset.result='correct';else if(k===oi)o.dataset.result='wrong';}
+        explain.textContent=(oi===q.answer?'✓ Correct. ':'Not quite. ')+q.explain;explain.hidden=false;audio.cue(oi===q.answer?'ready':'fail');
+        if(answers.filter(a=>a!==undefined).length===quiz.questions.length){const n=scoreRecap(quiz,answers);$('recap-score').textContent='Recap score: '+n+' / '+quiz.questions.length+(n===quiz.questions.length?' · you know exactly what happened out there.':n>=quiz.questions.length/2?' · good recall. Check the journal below for the rest.':' · read the journal below and try the mission again.');}
+      });return b;}));
+    item.append(prompt,options,explain);return item;
+  }));
+}
 function showDebrief() {
   if(mission.isExpedition){showExpeditionDebrief();return;}
   const d = mission.debrief();
@@ -562,7 +675,7 @@ function showDebrief() {
       if(result.correct){audio.cue('victory');for(const b of $('review-answers').children)b.disabled=true;$('debrief-title').textContent='Badge earned.';$('debrief-rank').textContent=mission.rank;syncAdvancement();updateUI();}
     });return button;
   }));
-  syncAdvancement();
+  syncAdvancement();renderRecapQuiz(d);
   $('debrief-journal').replaceChildren();
   for (const entry of d.journal.filter(e => e.type !== 'briefing').slice(-10)) { const div = document.createElement('div'), time = document.createElement('time'), span = document.createElement('span'); time.textContent = (entry.time / 60).toFixed(1) + 'm'; span.textContent = entry.message; div.append(time, span); $('debrief-journal').append(div); }
   try { const best = Number(storage?.getItem('luna-best') || 0); if (d.success && d.score > best) storage?.setItem('luna-best', String(d.score)); } catch { /* Storage may be disabled; play still works. */ }
@@ -683,9 +796,18 @@ function setMissionPanel(view){
   $('panel-mission').setAttribute('aria-pressed',String(!systems));
   $('panel-systems').setAttribute('aria-pressed',String(systems));
 }
+// The Mission panel is locked (inert) only while the story plays or while it is a closed drawer in a narrow window.
+// It is worked out from the current state every time, never restored from a saved value, so resizing the window
+// at any moment (also during the story) can never leave a visible panel that ignores clicks.
+let drawerQuery=null,drawerOpen=false;
+function syncPanelLock(){
+  const panel=$('mission-panel');
+  panel.inert=!!storyChromeState||(!!drawerQuery?.matches&&!drawerOpen);
+}
 function setupViewportControls(){
-  const narrow=window.matchMedia('(max-width:840px)');
-  const setDrawer=open=>{document.body.classList.toggle('hud-open',open);$('hud-button').setAttribute('aria-expanded',String(open));$('mission-panel').inert=!!narrow.matches&&!open;};
+  const narrow=drawerQuery=window.matchMedia('(max-width:840px)');
+  const setDrawer=open=>{drawerOpen=!!open;document.body.classList.toggle('hud-open',drawerOpen);$('hud-button').setAttribute('aria-expanded',String(drawerOpen));syncPanelLock();};
+  window.addEventListener('resize',syncPanelLock);
   $('hud-button').addEventListener('click',()=>setDrawer($('hud-button').getAttribute('aria-expanded')!=='true'));
   $('hud-close').addEventListener('click',()=>{setDrawer(false);$('hud-button').focus();});
   narrow.addEventListener?.('change',()=>setDrawer(false));setDrawer(false);
@@ -740,8 +862,10 @@ function setupEvents() {
   $('astra-follow-route').addEventListener('click',followAssistedRoute);
   $('astra-clear-route').addEventListener('click',()=>{clearAssistedRoute();askAstra('next');astraPanel.refresh();});
   $('astra-pick-point').addEventListener('click',()=>{selectingRoutePoint=!selectingRoutePoint;setView('surface');if(selectingRoutePoint){mission.route=null;setAstraOpen(false,false);notice('ASTRA: tap a point on the terrain or surface tracker. Escape cancels selection.');$('world').focus({preventScroll:true});}});
-  tutorialPanel = new MovablePanel({ panel: $('tutorial-card'), handle: $('tutorial-drag-handle'), resetButton: $('tutorial-position-reset'), storage, storageKey: 'luna-tutorial-position-v2', view: window, onGrab: () => keys.clear() });
-  astraPanel = new MovablePanel({ panel: $('astra-card'), handle: $('astra-drag-handle'), resetButton: $('astra-position-reset'), storage, storageKey: 'luna-astra-position-v1', view: window, onGrab: () => keys.clear() });
+  // The flight-school card stays inside the 3D view, so it never slides under the Mission panel in mid-size windows.
+  tutorialPanel = new MovablePanel({ panel: $('tutorial-card'), handle: $('tutorial-drag-handle'), resetButton: $('tutorial-position-reset'), storage, storageKey: 'luna-tutorial-position-v2', view: window, onGrab: () => keys.clear(),
+    bounds: () => $('tutorial-card').classList?.contains?.('in-dialog') ? null : document.querySelector?.('.playfield')?.getBoundingClientRect?.(), boundsElement: document.querySelector?.('.playfield') });
+  astraPanel = new MovablePanel({ panel: $('astra-card'), handle: $('astra-drag-handle'), resetButton: $('astra-position-reset'), storage, storageKey: 'luna-astra-position-v1', view: window, onGrab: () => keys.clear(), maxHeight: 620 });
   $('astra-button').disabled = false;
   $('astra-button').addEventListener('click', () => { audio.activate(); setAstraOpen($('astra-card').hidden); syncTutorial(); });
   $('astra-close').addEventListener('click', () => { setAstraOpen(false); syncTutorial(); });
@@ -873,14 +997,30 @@ function setupEvents() {
   new ResizeObserver(resize).observe($('world')); resize();
   if (window.LUNA_DATA) $('download-button').hidden = true;
 }
+// Performance: never draw faster than about 60 fps (high-refresh screens would otherwise double the work and heat),
+// and lower the drawing resolution in 10% steps (down to 70%) while frames stay slow, raising it again when there is headroom.
+const FRAME_MIN_MS=1000/60-3;
+let adaptSeconds=0,readoutSeconds=0;
+function adaptRenderScale(frameMs){
+  if(!renderer?.device||document.hidden||frameMs<=0)return;
+  adaptSeconds+=Math.min(frameMs,1000)/1000;if(adaptSeconds<3||performanceFrames.length<20)return;adaptSeconds=0;
+  const average=performanceFrames.reduce((a,b)=>a+b,0)/performanceFrames.length,current=Renderer.renderScale||1;
+  const next=average>26&&current>.7?Math.max(.7,Math.round((current-.1)*10)/10):average<18.5&&current<1?Math.min(1,Math.round((current+.1)*10)/10):current;
+  if(next===current)return;
+  Renderer.renderScale=next;performanceFrames.length=0;const rect=$('world').getBoundingClientRect();renderer.resize(rect.width,rect.height,Math.min(window.devicePixelRatio||1,renderer.maxDpr||1.5));
+}
 function animate(now) {
-  const frameMs=lastTime?now-lastTime:0;const dt=lastTime?Math.min(frameMs/1000,.1):0;lastTime=now;if(frameMs>0&&!document.hidden){performanceFrames.push(frameMs);if(performanceFrames.length>120)performanceFrames.shift();if($('performance-readout'))$('performance-readout').textContent='Observed '+(1000/(performanceFrames.reduce((a,b)=>a+b,0)/performanceFrames.length)).toFixed(1)+' FPS · '+graphicsQuality+' · '+(renderer.device?.info?.render?.triangles||0).toLocaleString()+' triangles';}
+  try{animateFrame(now);}catch(error){reportProblem('Game error: '+(error?.message||error)+'. The game keeps running; press F12 → Console for details.');console.error(error);requestAnimationFrame(animate);}
+}
+function animateFrame(now) {
+  if(lastTime&&now-lastTime<FRAME_MIN_MS){requestAnimationFrame(animate);return;}
+  const frameMs=lastTime?now-lastTime:0;const dt=lastTime?Math.min(frameMs/1000,.1):0;lastTime=now;if(frameMs>0&&!document.hidden){performanceFrames.push(frameMs);if(performanceFrames.length>120)performanceFrames.shift();adaptRenderScale(frameMs);readoutSeconds+=frameMs/1000;if(readoutSeconds>=.5&&$('performance-readout')){readoutSeconds=0;$('performance-readout').textContent='Observed '+(1000/(performanceFrames.reduce((a,b)=>a+b,0)/performanceFrames.length)).toFixed(1)+' FPS · '+graphicsQuality+' · '+(renderer.device?.info?.render?.triangles||0).toLocaleString()+' triangles · '+Math.round((Renderer.renderScale||1)*100)+'% resolution';}}
   if(story.active){
     const ended=story.update(Math.min(frameMs/1000,.5),document.hidden); /* Reading time follows the wall clock, even on slow GPUs. */updateStoryCaption();renderer.cinematicFrame?.(story.elapsed,story.chapter.shot);
     $('story-cut').style.opacity=String(renderer.cinematicFade||0);audio.updateOpening(story.elapsed);
     if(ended)finishStory();requestAnimationFrame(animate);return;
   }
-  if(flight?.active){const held=document.hidden||!!dialogOpen();flight.update(dt,held);syncFlight();flightRenderer.draw();audio.updateFlight?.(flight,held);requestAnimationFrame(animate);return;}
+  if(flight?.active){const held=document.hidden||!!dialogOpen();flight.update(dt,held);syncFlight();syncWeather(dt);flightRenderer.draw();audio.updateFlight?.(flight,held);requestAnimationFrame(animate);return;}
   if(astro?.mode==='exploration'&&!document.hidden){astro.advance(dt);explorationRenderTime+=dt;if(explorationRenderTime>.5&&skyHolding){renderScientificSky();explorationRenderTime=0;}}
   const right = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
   const down = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
@@ -888,7 +1028,7 @@ function animate(now) {
   if (!document.hidden && !dialogOpen() && $('astra-card').hidden && !skyHolding && !tutorial.holdsTime && renderer.mode==='surface') mission.update(dt, { ...vector, sprint: keys.has('shift'), jump: keys.has(' ') });
   else mission.state.moving = false;
   if(astro?.mode==='mission')astro.setMissionUTC(mission.utcStart+mission.state.time);
-  processEvents(); uiElapsed += dt;
+  updatePuzzleTimer(frameMs>0?Math.min(frameMs/1000,.25):0);syncWeather(dt);processEvents(); uiElapsed += dt;
   if (uiElapsed >= 0.25) { updateUI(); uiElapsed = 0; }
   audio.update(mission.state, life, tutorial.holdsTime); if(!$('story-dialog').open){if(renderer.mode==='solar')flightRenderer.drawSolarSystem();else renderer.draw(now / 1000, life);updateWayfinding();} requestAnimationFrame(animate);
 }
@@ -938,7 +1078,7 @@ function showExpeditionDebrief(){
  const d=mission.debrief(),f=d.forecast;$('debrief-dialog').dataset.success=String(d.success);$('debrief-title').textContent=d.success?'Mission secured. Crew protected.':'Mission review: try a new plan.';$('debrief-description').textContent=d.success?mission.scenario.title+' complete. The relay is restored, the science goal is met, and the crew has a calculated four-hour resupply margin.':mission.state.failureReason+'. Replay the last checkpoint or restart the mission.';$('debrief-emblem').textContent=d.success?'✦':'↻';$('debrief-rank').textContent=mission.rank;
  $('debrief-metrics').replaceChildren(...[[d.minutes.toFixed(1),'MISSION MINUTES'],[d.distanceKm.toFixed(2)+' km','DISTANCE'],[d.science+' / '+mission.scenario.minimumScience,'SCIENCE'],[d.outpost.energy.toFixed(1)+' kWh','BATTERY'],[d.outpost.health.toFixed(0)+'%','CREW HEALTH'],[d.decisions.length+' / 7','DECISIONS']].map(([value,label])=>{const n=document.createElement('div'),v=document.createElement('strong'),l=document.createElement('span');v.textContent=value;l.textContent=label;n.append(v,l);return n;}));
  $('debrief-learning').textContent='Resupply forecast in '+f.hours+' hours: '+f.final.oxygen.toFixed(1)+' crew·h oxygen, '+f.final.water.toFixed(1)+' L water, '+f.final.food.toFixed(1)+' food portions, '+f.final.energy.toFixed(1)+' kWh, '+f.final.health.toFixed(0)+'% health. '+d.learning+' Forecast keeps the current sunlight and operating plan.';$('skill-check').hidden=true;$('course-certificate').hidden=!d.success;$('course-certificate').textContent=d.success?mission.scenario.badge+' · '+mission.xp+' XP':'';$('next-level-button').hidden=false;$('next-level-button').textContent='Choose another journey →';
- $('debrief-journal').replaceChildren(...d.decisions.map(entry=>{const row=document.createElement('div'),name=document.createElement('strong'),text=document.createElement('span');row.className='debrief-decision';name.textContent=entry.title;text.textContent=entry.label+' · '+entry.minutes+' mission minutes · effects '+Object.entries(entry.effects).map(([k,v])=>k+': '+v).join(', ');row.append(name,text);return row;}));openDialog($('debrief-dialog'));
+ $('debrief-journal').replaceChildren(...d.decisions.map(entry=>{const row=document.createElement('div'),name=document.createElement('strong'),text=document.createElement('span');row.className='debrief-decision';name.textContent=entry.title;text.textContent=entry.label+' · '+entry.minutes+' mission minutes · effects '+Object.entries(entry.effects).map(([k,v])=>k+': '+v).join(', ');row.append(name,text);return row;}));renderRecapQuiz(d);openDialog($('debrief-dialog'));
 }
 function replaceSurfaceMission(destination,mode){
  keys.clear();flightRenderer.dispose();renderer.dispose?.();mission=createDestinationMission(pack,destination,storage,mode,astro);renderer=new Renderer($('world'),mission);if(flight.phase==='surface')renderer.showLandedCraft?.();flightRenderer=new FlightRenderer(renderer,flight,pack.solar);if(astro)flightRenderer.showOrbitLines=$('orbit-lines').checked;tutorial=new AcademyGuide(mission,storage);window.luna.mission=mission;window.luna.renderer=renderer;window.luna.tutorial=tutorial;displayedLesson='';const rect=$('world').getBoundingClientRect();renderer.resize(rect.width,rect.height,window.devicePixelRatio||1);applyGraphics();refreshLesson();buildSources();
@@ -981,6 +1121,8 @@ function setupExpeditionEvents(){
  $('telescope-magnification').addEventListener('input',()=>{const m=Number($('telescope-magnification').value);$('telescope-output').textContent=m+'×';renderer.surfaceSky.setMagnification(m);});
  $('graphics-quality').value=readPreference('luna-graphics-v1','balanced',storage);graphicsQuality=$('graphics-quality').value;
  $('graphics-quality').addEventListener('change',()=>{graphicsQuality=$('graphics-quality').value;writePreference('luna-graphics-v1',graphicsQuality,storage);applyGraphics();});
+ weatherMode=readPreference('luna-weather-v1','auto',storage);$('weather-mode').value=weatherMode;$('weather-mode').addEventListener('change',()=>{weatherMode=$('weather-mode').value;writePreference('luna-weather-v1',weatherMode,storage);syncWeather(0);});
+ $('puzzle-oxygen').checked=readPreference('luna-puzzle-oxygen-v1',false,storage)===true;$('puzzle-oxygen').addEventListener('change',()=>{writePreference('luna-puzzle-oxygen-v1',$('puzzle-oxygen').checked,storage);updatePuzzleTimer(0);});
  $('orbit-lines').checked=readPreference('luna-orbits-v1',true,storage)!==false;flightRenderer.showOrbitLines=$('orbit-lines').checked;$('orbit-lines').addEventListener('change',()=>{flightRenderer.showOrbitLines=$('orbit-lines').checked;writePreference('luna-orbits-v1',$('orbit-lines').checked,storage);});
  $('solar-body').replaceChildren(...Object.entries(astro.data.bodies).map(([name,body])=>{const option=document.createElement('option');option.value=name;option.textContent=name+' · '+body.kind;return option;}));$('solar-body').value='Earth';
  $('solar-probe').addEventListener('click',()=>{flightRenderer.probeBody=$('solar-body').value;flightRenderer.lookYaw=0;flightRenderer.lookPitch=0;$('solar-labels').hidden=true;notice('Scientific probe: apparent body size is preserved. Drag to look around. Gas and ice giants have no surface landing.');});
@@ -995,6 +1137,10 @@ function setupExpeditionEvents(){
 
 async function loadDonkiContext(){try{const d=window.LUNA_DONKI||await (await fetch('data/donki_archive.json')).json();const n=$('donki-context');n.textContent=d.loaded&&d.events?.length?'NASA CCMC / DONKI · archived, not live. '+d.events.length+' solar-flare records. Retrieved '+d.retrievedAt+'. '+d.events.slice(0,3).map(e=>e.beginTime+' / '+e.classType).join('; '):'DONKI: no archive imported. Solar alerts are authored practice events. Flare class is not an astronaut dose.';}catch{$('donki-context').textContent='DONKI archive unavailable. Game hazards remain authored teaching scenarios.';}}
 async function boot() {
+  window.addEventListener('error',event=>{if(/ResizeObserver loop/.test(event.message||''))return; /* harmless browser notice, not a game error */ reportProblem('Script error: '+(event.message||'unknown')+'.');});
+  window.addEventListener('unhandledrejection',event=>reportProblem('Background task failed: '+(event.reason?.message||event.reason||'unknown')+'.'));
+  const pageVersion=document.querySelector('meta[name="luna-build"]')?.content;
+  if(pageVersion!==LUNA_VERSION)reportProblem('This page ('+(pageVersion||'older version')+') and the game code ('+LUNA_VERSION+') are from different versions. Run npm.cmd run build, then press Ctrl+F5.');
   try {
     const data = window.LUNA_DATA || await loadGameData();
     pack=data;

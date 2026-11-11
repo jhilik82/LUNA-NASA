@@ -16,6 +16,9 @@ import { AstronomicalWorld } from '../dist/astronomy-world.js';
 import { powerBalance } from '../dist/expedition.js';
 import { createDestinationMission } from '../dist/worlds.js';
 import { loadGameData, connectLocalBackend } from '../dist/local-backend.js';
+import { PuzzleTimer, puzzleTimeLimit } from '../dist/puzzle-timer.js';
+import { buildRecapQuiz, scoreRecap } from '../dist/recap-quiz.js';
+import { chooseWeather, stageWeather } from '../dist/weather.js';
 
 // A minimal interface test double: verifies controller wiring, not browser layout or playback.
 class Element {
@@ -90,7 +93,7 @@ async function interfaceContext(storage,{skipStory=true,skipFlight=true,scientif
   for(const e of nodes.values())e.ownerDocument=document;
   const windowEvents = new Element();
   const shared=scientific?{...data,tranquillitatis:JSON.parse(fs.readFileSync(new URL('../dist/data/terrain-tranquillitatis.json',import.meta.url))),astronomy:JSON.parse(fs.readFileSync(new URL('../dist/data/astronomy.json',import.meta.url))),stars:JSON.parse(fs.readFileSync(new URL('../dist/data/stars.json',import.meta.url))),scenarios:JSON.parse(fs.readFileSync(new URL('../dist/data/scenarios.json',import.meta.url)))}:data;
-  const ctx = { document, loadGameData, connectLocalBackend, AstronomicalWorld,powerBalance,FlightSimulation,WORLDS,localSky,createDestinationMission,FlightRenderer:class{constructor(r,f,d){this.r=r;this.sim=f;this.data=d;this.rotations=[];this.hits=0;}draw(){}dispose(){}rotate(yaw,pitch){this.rotations.push({yaw,pitch});}hitButton(){this.hits++;return true;}drawSolarSystem(){}rotateSolar(){}}, Mission, TrainingMission, clamp, AcademyGuide, Soundtrack, MissionAudio, StorySequence, MovablePanel, resolveRouteRequest, planSurfaceRoute, readPreference, writePreference, Renderer: RenderDouble,
+  const ctx = { document, loadGameData, connectLocalBackend, AstronomicalWorld,powerBalance,PuzzleTimer,puzzleTimeLimit,buildRecapQuiz,scoreRecap,chooseWeather,stageWeather,FlightSimulation,WORLDS,localSky,createDestinationMission,FlightRenderer:class{constructor(r,f,d){this.r=r;this.sim=f;this.data=d;this.rotations=[];this.hits=0;}draw(){}dispose(){}rotate(yaw,pitch){this.rotations.push({yaw,pitch});}hitButton(){this.hits++;return true;}drawSolarSystem(){}rotateSolar(){}}, Mission, TrainingMission, clamp, AcademyGuide, Soundtrack, MissionAudio, StorySequence, MovablePanel, resolveRouteRequest, planSurfaceRoute, readPreference, writePreference, Renderer: RenderDouble,
     LUNA_DATA: shared, localStorage: storage, devicePixelRatio: 1, innerWidth:1440, innerHeight:900, matchMedia: () => ({ matches: false }), addEventListener:(...args)=>windowEvents.addEventListener(...args), fire:(...args)=>windowEvents.fire(...args),
     ResizeObserver: class { observe() {} }, console, setTimeout: () => 1, clearTimeout() {}, requestAnimationFrame(fn) { ctx.frame = fn; }
   };

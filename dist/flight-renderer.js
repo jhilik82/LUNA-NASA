@@ -6,8 +6,9 @@ import { ScientificSky } from './scientific-sky.js';
 import { exposureProfile, unit, add, length, DEG, v as av } from './astronomy-world.js';
 import { clamp, randomGenerator } from './engine.js';
 import { LandingScene, SURFACE_APPROACH_PHASES } from './landing-scene.js';
+import { WeatherEffects } from './weather.js';
 const V=THREE.Vector3;
-
+const performanceNow=()=>globalThis.performance?.now?.()??Date.now();
 const box=(p,m,pos,size,name='')=>mesh(p,roundedBox(...size),m,pos,null,name);
 export const CREW_ENTRY={floorY:25.125,ceilingY:27.25,halfAngle:.36,startX:-13,endX:-.65,z:0};
 export const LAUNCH_COAST={halfExtent:850,shoreZ:-320,seaY:-.045};
@@ -81,6 +82,8 @@ export class FlightRenderer{
   if(simulation.world){this.sharedSky=new ScientificSky({scene:this.scene,camera:this.camera,createCanvas:renderer.createCanvas,world:simulation.world,getView:()=>this.flightSkyView()});}
   this.dust=[];for(let i=0;i<90;i++){const m=mesh(this.scene,new THREE.IcosahedronGeometry(1,1),new THREE.MeshStandardMaterial({color:'#b5a792',transparent:true,opacity:.3,depthWrite:false}),[0,0,0],null,'exhaust-condensation');m.castShadow=false;this.dust.push({mesh:m,seed:rng()});}
   this.buildCruiseBackdrop();this.buildBusHardware();
+  // Weather at the launch site, and the solar wind during the cruise.
+  this.padWeather=new WeatherEffects(this.scene,{scale:1,place:'earth'});this.spaceWeather=new WeatherEffects(this.scene,{scale:6,place:'space'});
   // Space bodies and the shared sky never take on launch-site haze.
   for(const g of [this.earth,this.moon,this.mars,this.windowEarth,this.stars,this.sharedSky?.group].filter(Boolean))g.traverse(o=>{if(o.material)for(const m of [].concat(o.material))m.fog=false;});
  }
@@ -89,6 +92,7 @@ export class FlightRenderer{
   for(const b of bodies){if(!orbital)b.visible=b.altitude+b.diameterDeg/2>=0;for(const other of bodies){if(other.name===b.name||other.distanceKm>=b.distanceKm)continue;const separation=Math.acos(clamp(b.icrf.x*other.icrf.x+b.icrf.y*other.icrf.y+b.icrf.z*other.icrf.z,-1,1))/DEG;if(separation+b.diameterDeg/2<other.diameterDeg/2)b.visible=false;}}
   return {observer,bodies,sun,orbital,dust:observer.world==='mars'&&!orbital?.22:0,profile:exposureProfile({sunAltitude:orbital?20:sun.altitude,dust:0,exposure:world.exposure,enhanced:world.enhanced})};
  }
+
  // Deep-space cruise backdrop: colour-varied stars, a visible Sun glow and the Earth → destination route.
  buildCruiseBackdrop(){
   const rng=randomGenerator(4411),positions=[],colors=[],c=new THREE.Color();
@@ -132,8 +136,7 @@ export class FlightRenderer{
   this.spark=new THREE.Sprite(new THREE.SpriteMaterial({map:sparkTexture,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));this.spark.position.set(0,0,.35);this.spark.scale.setScalar(1.6);this.junction.add(this.spark);
   this.sparkLight=new THREE.PointLight('#ff6a4a',0,14,2);this.sparkLight.position.set(0,0,.8);this.junction.add(this.sparkLight);
   this.rcsPuffs=[];for(const y of [21,7]){const puff=new THREE.Sprite(new THREE.SpriteMaterial({map:this.sunGlow.material.map,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0,toneMapped:false}));puff.position.set(0,y,3.6);puff.scale.setScalar(2.2);g.add(puff);this.rcsPuffs.push(puff);}
-  // Visual effects only: never hit-tested.
-  for(const sprite of [this.spark,this.sunGlow,...this.rcsPuffs])sprite.raycast=()=>{};
+  for(const sprite of [this.spark,this.sunGlow,...this.rcsPuffs])sprite.raycast=()=>{}; // visual effects only, never hit-tested
   this.busLights=lights;this.setBusState('nominal',0,0);
  }
  // States: nominal, fault, isolate (circuit cut off, then bus restored), backup (battery switched in, then bus restored).
@@ -177,7 +180,8 @@ export class FlightRenderer{
   box(this.pad,new THREE.MeshStandardMaterial({color:'#3a6a80',roughness:.16,metalness:.08}),[0,coast.seaY-.075,(coast.shoreZ-coast.halfExtent)/2],[width,.15,seaDepth],'distant-ocean');
   const shore=mesh(this.pad,new THREE.PlaneGeometry(width,16),new THREE.MeshStandardMaterial({color:'#b8ab86',roughness:1}),[0,.012,coast.shoreZ+8],null,'shoreline');shore.rotation.x=-Math.PI/2;shore.receiveShadow=true;
   // Atmospheric haze hides the finite edges of land and sea and blends them into the sky's horizon colour.
-  this.haze=new THREE.FogExp2('#6ea1bf',.0021);  this.sky=mesh(this.scene,new THREE.SphereGeometry(9500,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,depthTest:false,depthWrite:false,uniforms:{fade:{value:1},day:{value:1},twilight:{value:0},sunDirection:{value:new V(-120,180,-90).normalize()}},vertexShader:'varying vec3 p;void main(){p=position;vec4 clip=projectionMatrix*modelViewMatrix*vec4(position,1.0);gl_Position=clip.xyww;}',fragmentShader:`
+  this.haze=new THREE.FogExp2('#6ea1bf',.0021);
+  this.sky=mesh(this.scene,new THREE.SphereGeometry(9500,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,depthTest:false,depthWrite:false,uniforms:{fade:{value:1},day:{value:1},twilight:{value:0},sunDirection:{value:new V(-120,180,-90).normalize()}},vertexShader:'varying vec3 p;void main(){p=position;vec4 clip=projectionMatrix*modelViewMatrix*vec4(position,1.0);gl_Position=clip.xyww;}',fragmentShader:`
     varying vec3 p;uniform float fade;uniform float day;uniform float twilight;uniform vec3 sunDirection;
     void main(){
       vec3 direction=normalize(p);float h=clamp(direction.y,0.0,1.0);
@@ -263,8 +267,8 @@ export class FlightRenderer{
   this.pad.visible=['briefing','boarding','cockpit','ignition'].includes(p)||p==='ascent'&&tele.altitudeM<10000;this.ship.visible=!SURFACE_APPROACH_PHASES.includes(p);this.lander.visible=!this.ship.visible;this.mat.regolith.color.set(f.destination==='mars'?'#987252':'#888b8b');
   this.cockpit.visible=inside;this.pilot.userData.helmet.visible=!(inside&&this.pilotView);this.cadet.visible=p==='boarding';this.sky.visible=this.pad.visible;this.sky.material.uniforms.fade.value=p==='ascent'?1-clamp(t/13,0,1):1;this.stars.visible=!this.pad.visible||p==='ascent'&&t>12;
   this.earth.visible=!inside&&['ascent','transfer'].includes(p);this.moon.visible=this.mars.visible=false;
-  this.ship.position.set(0,p==='ascent'?t*t*2:0,0);this.ship.rotation.set(0,0,p==='ascent'?-clamp(t/18,0,1)*.19:0);  
-  const hatch=this.ship.userData.crewHatch,open=p==='boarding'?clamp(t/.65,0,1)*(1-clamp((t-5.6)/.35,0,1)):0;hatch.pivot.quaternion.setFromAxisAngle(hatch.axis,-2.6*open);
+  this.ship.position.set(0,p==='ascent'?t*t*2:0,0);this.ship.rotation.set(0,0,p==='ascent'?-clamp(t/18,0,1)*.19:0);
+  const hatch=this.ship.userData.crewHatch,open=p==='boarding'?clamp(t/.65,0,1)*(1-clamp((t-5.6)/.35,0,1)):0;hatch.pivot.quaternion.setFromAxisAngle(hatch.axis,-2.6*open); // Folds flat against the hull, clear of the walkway and rails.
   for(const flame of this.ship.userData.flames){flame.visible=p==='ignition'||p==='ascent';flame.scale.y=1+(r.reducedMotion?0:Math.sin(t*27)*.05);flame.material.uniforms.time.value=r.reducedMotion?0:t;flame.material.uniforms.air.value=clamp(tele.exteriorPressureKpa/101.325,0,1);}
   for(const d of this.dust){const a=d.seed*Math.PI*2,age=(t+d.seed*3)%3;d.mesh.visible=!r.reducedMotion&&(p==='ignition'||p==='ascent'&&t<5);d.mesh.position.set(Math.cos(a)*age*9,age*2,Math.sin(a)*age*9);d.mesh.scale.setScalar(1+age*2.3);d.mesh.material.opacity=.3*(1-age/3);}
   if(p==='briefing'){this.camera.position.set(52,30,-72);this.orbitAround(new V(0,18,0));}
@@ -300,14 +304,14 @@ export class FlightRenderer{
   this.sun.target.position.copy(inside?this.cockpit.position:this.ship.visible?this.ship.position:this.lander.position).add(new V(0,inside?1:14,0));const span=inside?2.5:45;Object.assign(this.sun.shadow.camera,{left:-span,right:span,top:span,bottom:-span});this.sun.shadow.camera.updateProjectionMatrix();
   const cruise=p==='transfer'&&!inside;this.cruise.visible=cruise;
   if(this.sharedSky)this.sharedSky.group.visible=!cruise;
-  if(this.sharedSky&&!cruise){this.earth.visible=this.moon.visible=this.mars.visible=this.windowEarth.visible=false;this.stars.visible=false;this.sharedSky.update();}
+  if(this.sharedSky&&!cruise){this.earth.visible=this.moon.visible=this.mars.visible=this.windowEarth.visible=false;this.stars.visible=false;this.sharedSky.update();if(!this.pad.visible)this.sky.visible=false;this.sun.position.copy(this.sun.target.position).add(new V(this.sharedSky.lastView.sun.direction.x,this.sharedSky.lastView.sun.direction.y,this.sharedSky.lastView.sun.direction.z).multiplyScalar(200));}else this.sun.position.copy(this.sun.target.position).add(new V(-120,180,-90));this.sun.target.updateMatrixWorld();
   const solarAltitude=this.sharedSky?.lastView?.sun.altitude??34,day=THREE.MathUtils.smoothstep(solarAltitude,-8,6),night=1-day;
   this.sky.position.copy(this.camera.position);this.sky.material.uniforms.day.value=day;this.sky.material.uniforms.twilight.value=clamp(1-Math.abs(solarAltitude+2)/10,0,1);this.sky.material.uniforms.sunDirection.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
   this.ambient.intensity=inside?.22:f.localSortie?.12:.10+.90*day;this.sun.intensity=solarAltitude>0?(inside?.65:3.3):0;this.fill.intensity=0;
   if(cruise){
-   // Deep space has no horizon: the Sun is always up. Side key light, soft fill from the camera side.
+   // Deep space has no horizon: the Sun is always up. Key light from a visible Sun (upper left), soft fill from the camera side.
    const forward=new V(),right=new V(),up=new V();this.camera.getWorldDirection(forward);right.crossVectors(forward,this.camera.up).normalize();up.crossVectors(right,forward).normalize();
-   const sunDirection=forward.clone().multiplyScalar(.38).add(right.clone().multiplyScalar(-.86)).add(up.multiplyScalar(.34)).normalize();
+   const sunDirection=forward.clone().multiplyScalar(.38).add(right.clone().multiplyScalar(-.86)).add(up.multiplyScalar(.34)).normalize(); // side-lit: half-lit worlds, readable hull
    this.sun.position.copy(this.sun.target.position).addScaledVector(sunDirection,200);this.sun.intensity=3.4;this.ambient.intensity=.34;
    this.fill.position.copy(this.camera.position);this.fill.target.position.copy(this.sun.target.position);this.fill.intensity=1.15;
    this.sunGlow.position.copy(this.camera.position).addScaledVector(sunDirection,6500);this.cruise.position.set(0,0,0);this.cruiseStars.position.copy(this.camera.position);
@@ -316,7 +320,15 @@ export class FlightRenderer{
   const ev=f.flightEvent,busState=p==='transfer'&&!ev.resolved?'fault':ev.resolved&&['transfer','capture'].includes(p)?ev.choice:ev.choice==='isolate'&&!['briefing','boarding','cockpit','ignition','ascent'].includes(p)?'isolate':'nominal';
   this.setBusState(busState,ev.resolved&&p==='transfer'?f.elapsed-(ev.at??f.elapsed):99,r.reducedMotion?0:performanceNow()/1000);
   const hazy=this.pad.visible&&!f.localSortie&&!inside;this.scene.fog=hazy?this.haze:null;
-  if(hazy)this.haze.color.setRGB(.002+.428*day,.003+.627*day,.007+.743*day).multiplyScalar(this.sky.material.uniforms.fade.value);  for(const light of this.padLights)light.intensity=this.pad.visible&&!inside?light.userData.nightIntensity*night:0;
+  if(hazy)this.haze.color.setRGB(.002+.428*day,.003+.627*day,.007+.743*day).multiplyScalar(this.sky.material.uniforms.fade.value);
+  const clock=performanceNow()/1000,weatherDt=Math.min(.1,Math.max(0,clock-(this.weatherClock??clock)));this.weatherClock=clock;
+  this.padWeather.group.visible=hazy;this.spaceWeather.group.visible=cruise;this.lightningFlash=0;
+  if(hazy){
+   const w=this.padWeather.update(weatherDt,this.camera,{groundY:0,reducedMotion:r.reducedMotion}),cloud=this.padWeather.condition.cloud||0;
+   this.sun.intensity*=w.sun;this.haze.density=Math.max(.0021*w.haze,w.fogDensity);this.haze.color.lerp(new THREE.Color(.16,.18,.2).multiplyScalar(.4+.6*day),.75*cloud);this.sky.material.uniforms.day.value*=1-.62*cloud;this.ambient.intensity+=w.flash*1.6;this.lightningFlash=w.flash;
+  }
+  if(cruise)this.spaceWeather.update(weatherDt,this.camera,{sunDirection:this.sun.position.clone().sub(this.sun.target.position).normalize(),reducedMotion:r.reducedMotion});
+  for(const light of this.padLights)light.intensity=this.pad.visible&&!inside?light.userData.nightIntensity*night:0;
   this.scene.updateMatrixWorld(true);r.device.render(this.scene,this.camera);
  }
  updateScreens(tele){

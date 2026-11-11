@@ -8,6 +8,7 @@ import { clamp, randomGenerator } from './engine.js';
 import { WORLD_SCALE, isOccupied } from './world-layout.js';
 import { openingMotion, astronautPose, ballisticDust } from './animation.js';
 import { TrackingMaps } from './maps.js';
+import { batchStaticMeshes } from './static-batch.js';
 import { materialDetail } from './material-detail.js';
 import { surfaceMaterials, surfaceRockGeometry, applySurfaceMaps } from './surface-materials.js';
 import { referencePatches, surfaceGeometry, removePatchTriangles, layeredOutcropGeometry, surfaceSample, renderedSurfaceHeight } from './reference-geometry.js';
@@ -40,7 +41,7 @@ export class Renderer {
     this.device.toneMapping=THREE.ACESFilmicToneMapping;this.device.toneMappingExposure=1.15;this.device.outputColorSpace=THREE.SRGBColorSpace;
     this.buildTerrain();this.buildScenery();this.buildSky();
     this.footprints=new THREE.InstancedMesh(new THREE.PlaneGeometry(mission.config.world==='moon'?.19:.14,mission.config.world==='moon'?.34:.33).rotateX(-Math.PI/2),mission.config.world==='moon'?lunarImpressionMaterial('boot',this.unitsPerMetre):new THREE.MeshStandardMaterial({color:'#45413b',roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}),768);this.footprints.count=0;this.footprints.frustumCulled=false;this.footprintCursor=0;this.scene.add(this.footprints);
-    this.player=createAstronaut(this.mat);this.rover=createRover(this.mat,mission.config.world);this.scene.add(this.player,this.rover);if(this.physical){this.player.scale.setScalar(.35*this.unitsPerMetre);this.rover.scale.setScalar(.7*this.unitsPerMetre);}this.buildCinematic();
+    this.player=createAstronaut(this.mat);this.rover=createRover(this.mat,mission.config.world);batchStaticMeshes(this.player);batchStaticMeshes(this.rover);this.scene.add(this.player,this.rover);if(this.physical){this.player.scale.setScalar(.35*this.unitsPerMetre);this.rover.scale.setScalar(.7*this.unitsPerMetre);}this.buildCinematic();
     this.fieldSample=mesh(this.scene,new THREE.DodecahedronGeometry(1.1),this.mat.rock,[0,0,0],[1.3,.6,1],'collectable-field-sample');
     this.carriedSample=mesh(this.player,new THREE.CylinderGeometry(.32,.32,.85,12),this.mat.gold,[1.2,1.4,.45],null,'carried-sample');
     this.roverCargo=this.makeCargo();this.roverCargo.position.set(0,2.55,-2.2);this.rover.add(this.roverCargo);
@@ -82,6 +83,8 @@ export class Renderer {
       const p=mesh(this.cinemaGroup,geometry,this.mat.rock);p.castShadow=false;p.visible=false;
       this.cinemaDust.push({mesh:p,kind:i<80?'lander':'rover',angle:rng()*Math.PI*2,start:i<80?3.15+rng()*1.8:6.1+rng()*2.6,speed:i<80?3+rng()*8:.7+rng()*3,lift:.35+rng()*1.1,life:1.25+rng()*.85,size:.035+rng()*.085,side:rng()>.5?1:-1});
     }
+    // The lander and the mentor are drawn after landing for the rest of the session: merge their static parts.
+    batchStaticMeshes(this.lander,{protect:[this.plume,this.engineLight,...(this.lander.userData.legs||[]).map(leg=>leg.getObjectByName('landing-foot'))]});batchStaticMeshes(this.mentor);
   }
   positionLander(altitudeM=0,tilt=0){
     const u=this.unitsPerMetre;this.lander.position.copy(this.landingOrigin).add(new V(0,(altitudeM-.03)*u,0));this.lander.rotation.set(0,0,tilt);
@@ -118,12 +121,14 @@ export class Renderer {
     this.surfaceSamples=[...samples,surfaceSample(geometry,{x0:0,x1:t.width-1,y0:0,y1:t.height-1})];
     this.mat.rock.color.set('#ffffff');this.mat.rock.map=this.surfaceMaps.rock;this.mat.rock.bumpMap=this.surfaceMaps.rockRelief;this.mat.rock.bumpScale=.018*this.unitsPerMetre;this.mat.rock.metalness=0;
     this.buildRegionalGround();
-    const rng=randomGenerator(183);this.rocks=[];
+    // Pebbles never move: build them in one group and merge them into a single draw call.
+    const rng=randomGenerator(183),pebbles=new THREE.Group();pebbles.name='decorative-pebble';this.scene.add(pebbles);this.rocks=[pebbles];
     for(let i=0;i<210;i++) {
       const p={x:2+rng()*(t.width-4),y:2+rng()*(t.height-4)};
       if(this.mission.props.some(o=>Math.hypot(o.x-p.x,o.y-p.y)<3)||Math.hypot(p.x-this.mission.state.rover.x,p.y-this.mission.state.rover.y)<3)continue;
-      const size=(this.physical?.09+Math.pow(rng(),2)*.45:.15+rng()*.33)*this.unitsPerMetre;const rock=mesh(this.scene,surfaceRockGeometry(world),this.mat.rock,this.world(p,size*.12).toArray(),[size,size,size],'decorative-pebble');rock.rotation.y=rng()*Math.PI;this.rocks.push(rock);
+      const size=(this.physical?.09+Math.pow(rng(),2)*.45:.15+rng()*.33)*this.unitsPerMetre;const rock=mesh(pebbles,surfaceRockGeometry(world),this.mat.rock,this.world(p,size*.12).toArray(),[size,size,size],'decorative-pebble');rock.rotation.y=rng()*Math.PI;
     }
+    batchStaticMeshes(pebbles);
     if(this.physical&&world==='moon'){
       this.lunarClasts=new LunarClastField(this);this.rocks.push(this.lunarClasts.group);
     }else if(this.physical){
@@ -175,6 +180,8 @@ export class Renderer {
       const top=Math.max(g.position.y,...corners),low=Math.min(g.position.y,...corners)-.35;g.position.y=top;
       if(this.physical){for(const [x,z]of[[-1,-1],[1,-1],[-1,1],[1,1]]){const px=x*(p.halfX||p.radius)*.75,pz=z*(p.halfY||p.radius)*.75,bottom=this.world({x:p.x+px,y:p.y+pz}).y,height=Math.max(.08,(top-bottom)/this.unitsPerMetre);mesh(g,new THREE.CylinderGeometry(.14,.20,height,8),this.mat.silver,[px*WORLD_SCALE/this.unitsPerMetre,-height/2,pz*WORLD_SCALE/this.unitsPerMetre],null,'terrain-adjusted-support');mesh(g,new THREE.CylinderGeometry(.34,.34,.06,12),this.mat.dark,[px*WORLD_SCALE/this.unitsPerMetre,-height,pz*WORLD_SCALE/this.unitsPerMetre],null,'ground-contact-foot');}}
       else mesh(g,new THREE.BoxGeometry((p.halfX||p.radius)*16/this.unitsPerMetre,(top-low)/this.unitsPerMetre,(p.halfY||p.radius)*16/this.unitsPerMetre),this.mat.regolith,[0,-(top-low)/2,0],null,'equipment-footing');
+      // Static parts that share a material become one draw call; moving parts (userData references) stay separate.
+      batchStaticMeshes(g);
     }
     this.surveys=this.mission.science.map(p=>{const g=createSurvey(this.mat);g.position.copy(this.world(p));g.userData.site=p;this.scene.add(g);return g;});
     this.satellite=createSatellite(this.mat);this.satellite.position.copy(this.world(this.mission.objects.base,34)).add(new V(25,0,-20));this.satellite.visible=false;this.scene.add(this.satellite);
@@ -204,7 +211,8 @@ export class Renderer {
     }else{this.suitLamp=new THREE.PointLight('#e5edf5',this.physical?120*this.unitsPerMetre**2:4,this.physical?24*this.unitsPerMetre:36,2);this.scene.add(this.suitLamp);}
   }
   resize(width,height,dpr=1) {
-    this.width=Math.max(1,width);this.height=Math.max(1,height);this.dpr=Math.min(dpr,this.maxDpr||1.6);
+    // Renderer.renderScale (0.7–1) is lowered automatically when frames are slow; it applies to every world the game builds.
+    this.width=Math.max(1,width);this.height=Math.max(1,height);this.dpr=Math.min(dpr,this.maxDpr||1.6)*(Renderer.renderScale||1);
     this.device.setPixelRatio(this.dpr);this.device.setSize(this.width,this.height,false);this.camera.aspect=this.width/this.height;this.camera.updateProjectionMatrix();
     this.orbitCanvas.width=this.width;this.orbitCanvas.height=this.height;this.orbitTexture.needsUpdate=true;
   }
@@ -275,9 +283,15 @@ export class Renderer {
     const ahead=world.clone().sub(this.camera.position).dot(this.camera.getWorldDirection(new V()))>0;
     let visible=ahead;
     if(occlusion&&visible){
-      const body=this.world(point,this.physical?1.1*this.unitsPerMetre:2.5),distance=this.camera.position.distanceTo(body);
-      const ray=new THREE.Raycaster(this.camera.position,body.clone().sub(this.camera.position).normalize(),0,Math.max(0,distance-.35));
-      visible=ray.intersectObjects([this.scenery,this.ground,...this.terrainPatches,...(this.geology?[this.geology]:[]),...(this.mission.state.rover.occupied?[]:[this.rover])],true).length===0;
+      // This ray tests the whole terrain, so the answer is reused for 0.15 s unless the camera or the target moves.
+      const now=globalThis.performance?.now?.()??Date.now(),cache=this.occlusionCache,move=(this.physical?.25*this.unitsPerMetre:.5)**2;
+      if(cache&&cache.x===point.x&&cache.y===point.y&&now-cache.at<150&&cache.camera.distanceToSquared(this.camera.position)<move)visible=cache.visible;
+      else{
+        const body=this.world(point,this.physical?1.1*this.unitsPerMetre:2.5),distance=this.camera.position.distanceTo(body);
+        const ray=new THREE.Raycaster(this.camera.position,body.clone().sub(this.camera.position).normalize(),0,Math.max(0,distance-.35));
+        visible=ray.intersectObjects([this.scenery,this.ground,...this.terrainPatches,...(this.geology?[this.geology]:[]),...(this.mission.state.rover.occupied?[]:[this.rover])],true).length===0;
+        this.occlusionCache={x:point.x,y:point.y,at:now,camera:this.camera.position.clone(),visible};
+      }
     }
     let px=(position.x+1)*this.width/2,py=(1-position.y)*this.height/2;
     const delta={x:point.x-this.mission.state.player.x,y:point.y-this.mission.state.player.y},basis=this.mission.screenBasis||{right:this.inputVector(1,0),down:this.inputVector(0,1)};

@@ -187,6 +187,11 @@ export class Circuit {
   }
   connections(index) { return this.ports[index].map(port => (port + this.turns[index]) % 4); }
   rotate(index) { this.turns[index] = (this.turns[index] + 1) % 4; this.moves++; }
+  // Time ran out: the bus trips and every tile is turned to a new random angle (never already solved).
+  scramble(seed) {
+    const rng = randomGenerator(seed); this.turns = this.ports.map(() => Math.floor(rng() * 4)); this.moves = 0;
+    while (this.connected()) this.turns[this.input.index] = (this.turns[this.input.index] + 1) % 4;
+  }
   powered() {
     const seen = new Set();
     if (!this.connections(this.input.index).includes(this.input.side)) return seen;
@@ -395,6 +400,16 @@ export class Mission {
     this.circuit = null; this.events.push({ type: 'repaired' }); return true;
   }
   cancelRepair() { if (this.state.status === 'repair') { this.state.status = 'playing'; this.circuit = null; } }
+  // Suit oxygen spent while working a repair in overtime. Running out ends the mission like any other oxygen loss.
+  spendOxygen(minutes, reason = 'repair overtime') {
+    const s = this.state; if (!(minutes > 0) || ['failed', 'complete'].includes(s.status)) return s.oxygen;
+    s.oxygen = Math.max(0, s.oxygen - minutes);
+    if (s.oxygen <= 0) {
+      s.status = 'failed'; s.failureReason = 'Oxygen reserve exhausted during ' + reason; this.circuit = null; this.route = null;
+      this.record('abort', s.failureReason); this.events.push({ type: 'ended' });
+    }
+    return s.oxygen;
+  }
   scan(site) {
     if (this.state.status !== 'playing' || this.state.suitWh < this.config.suit.scanWh) return;
     if (this.state.scans.includes(site.id)) return;

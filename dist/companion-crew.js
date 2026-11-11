@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {createAstronaut} from './models.js';
+import {createAstronaut,SUIT_ACCENTS} from './models.js';
+import {batchStaticMeshes} from './static-batch.js';
 import {isOccupied} from './world-layout.js';
 
 /** Three visible coworkers plus the player = four crew. Decorative routines use
@@ -13,7 +14,7 @@ export class CompanionCrew {
    const points=Array.from({length:24},(_,i)=>{const a=i*Math.PI/12;return {x:prop.x+Math.cos(a)*(Math.hypot(prop.halfX,prop.halfY)+2/c),y:prop.y+Math.sin(a)*(Math.hypot(prop.halfX,prop.halfY)+2/c)};});
    return points.find(p=>m.terrain.inBounds(p.x,p.y)&&!isOccupied(p,m.colliders(),.4/c)&&m.terrain.route(b,p,m.config.walkMaxSlopeDegrees))||{...b};
   });
-  this.actors=this.stations.map((p,i)=>{const model=createAstronaut(renderer.mat);model.name=['Botanist Mira','Engineer Sol','Scientist Kai'][i];if(renderer.physical)model.scale.setScalar(.35*renderer.unitsPerMetre);this.group.add(model);return {model,position:{...p},station:i,wait:5+i*3,phase:i,path:[],index:0};});
+  this.actors=this.stations.map((p,i)=>{const model=createAstronaut(renderer.mat,{accent:[SUIT_ACCENTS.botanist,SUIT_ACCENTS.engineer,SUIT_ACCENTS.scientist][i]});batchStaticMeshes(model);model.name=['Botanist Mira','Engineer Sol','Scientist Kai'][i];if(renderer.physical)model.scale.setScalar(.35*renderer.unitsPerMetre);this.group.add(model);return {model,position:{...p},station:i,wait:5+i*3,phase:i,path:[],index:0};});
  }
  update(dt,time){
   const r=this.renderer,m=this.mission;this.group.visible=!r.cinematic&&!r.skyOnly;if(!this.group.visible)return;
