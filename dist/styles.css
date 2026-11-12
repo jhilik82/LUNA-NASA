@@ -365,14 +365,13 @@ body.in-story #world{position:absolute;inset:0;width:100%;height:100%;border-rad
 .puzzle-timer[data-level="warning"] .puzzle-timer-bar i{background:linear-gradient(90deg,#ffb347,#ffd27a)}
 .puzzle-timer[data-level="danger"]{border-color:#8a2f2a;animation:timer-pulse 1s ease-in-out infinite}.puzzle-timer[data-level="danger"] strong{color:#ff6b5e}
 .puzzle-timer[data-level="danger"] .puzzle-timer-bar i{background:linear-gradient(90deg,#ff4b3e,#ff8a6b)}
-.puzzle-timer[data-level="overtime"]{border-color:#8a2f2a;background:#1d0e10}.puzzle-timer[data-level="overtime"] strong{color:#ff8a6b}
+.puzzle-timer[data-level="expired"]{border-color:#8a2f2a;background:#1d0e10}.puzzle-timer[data-level="expired"] strong{color:#ff8a6b}
+.puzzle-timer[data-level="extra"]{border-color:#7a5b23;background:#1a150b}.puzzle-timer[data-level="extra"] strong{color:#ffc35a}
+.puzzle-timer[data-level="extra"] .puzzle-timer-bar i{background:linear-gradient(90deg,#ff9f43,#ffd27a)}
 .puzzle-timer[data-tripped]{animation:timer-trip .5s ease 2}
-.puzzle-oxygen{display:flex;align-items:center;gap:10px;margin:4px 0 8px;padding:8px 12px;border:1px solid #2f4a52;border-radius:10px;cursor:pointer;font-size:13px;color:#d9ebe7}
-.puzzle-oxygen input{width:18px;height:18px;accent-color:#3fd29b;flex:none}
-.puzzle-oxygen span{flex:1}
+.puzzle-oxygen{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 14px;margin:4px 0 8px;padding:8px 12px;border:1px solid #2f4a52;border-radius:10px;font-size:12.5px;color:#c9dcd8}
 .puzzle-oxygen b{font-family:var(--mono);font-size:13px;color:#7be8db;white-space:nowrap}
 .puzzle-oxygen b[data-low]{color:#ff8a6b}
-.puzzle-oxygen:has(input:checked){border-color:#3fd29b;background:#0c1f1a}
 @keyframes timer-pulse{50%{box-shadow:0 0 0 3px #ff4b3e33}}
 @keyframes timer-trip{30%{transform:translateX(-5px)}70%{transform:translateX(5px)}}
 @media (prefers-reduced-motion:reduce){.puzzle-timer,.puzzle-timer[data-tripped]{animation:none!important}}
@@ -437,3 +436,19 @@ body.in-story #world{position:absolute;inset:0;width:100%;height:100%;border-rad
   body.in-flight .astra-launcher>span:not(.astra-launcher-symbol){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   body.in-flight .destination-picker,body.in-flight .flight-instruction,body.in-flight .landing-controls,body.in-flight .flight-event{right:64px}
 }
+
+/* Repair clock: the "time's up" choice, and a locked board while it is shown. */
+.puzzle-extend{margin-top:10px;padding:10px 12px;border-radius:9px;background:#2a1012;border:1px solid #ff6b5e88}
+.puzzle-extend p{margin:0 0 8px!important;color:#ffe2dc!important;font-size:13px!important;line-height:1.45}
+.puzzle-extend-actions{display:flex;flex-wrap:wrap;gap:8px}
+.puzzle-extend-actions button{flex:1 1 150px;min-height:38px}
+.circuit-frame.locked .circuit-grid{pointer-events:none;opacity:.55;filter:saturate(.6)}
+/* Circuit boards from 3×3 up to 5×5: tiles shrink to fit the dialog. Wires turn smoothly in 45° steps. */
+.circuit-frame{--cols:3;--rows:3;--tile-size:min(70px,calc((min(100vw,560px) - 150px - (var(--cols) - 1) * var(--circuit-gap)) / var(--cols)));grid-template-columns:var(--terminal-size) repeat(var(--cols),var(--tile-size)) var(--terminal-size);grid-template-rows:var(--terminal-size) repeat(var(--rows),var(--tile-size)) var(--terminal-size)}
+.circuit-frame .circuit-grid,.circuit-grid{grid-area:2 / 2 / calc(var(--rows) + 2) / calc(var(--cols) + 2);grid-template-columns:repeat(var(--cols),var(--tile-size))}
+.circuit-tile svg{stroke-linecap:round;overflow:visible}
+
+/* Recap quiz: hint after a wrong first try, pass/fail score, retry. */
+.recap-hint{margin:6px 0 0!important;padding:7px 10px;border-radius:7px;background:#2a2410;border:1px solid #c9a24a77;color:#ffe7b0;font-weight:500!important;font-size:12.5px}
+#recap-score[data-result="fail"]{color:#ff9a8a}
+#recap-retry{margin-top:8px}
