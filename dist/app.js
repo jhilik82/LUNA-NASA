@@ -1,8 +1,8 @@
 import { clamp } from './engine.js';
 import { TrainingMission } from './academy.js';
 import { Renderer } from './render-3d.js';
-import { PuzzleTimer, puzzleTimeLimit } from './puzzle-timer.js';
-import { buildRecapQuiz, scoreRecap } from './recap-quiz.js';
+import { PuzzleTimer, puzzleTimeLimit, PUZZLE_TIME_SECONDS, EXTENSION_SECONDS, EXTENSION_OXYGEN_PERCENT, MAX_EXTENSIONS } from './puzzle-timer.js';
+import { buildRecapQuiz, scoreRecap, reshuffleQuestion } from './recap-quiz.js';
 import { chooseWeather, stageWeather } from './weather.js';
 import { AcademyGuide } from './academy-guide.js';
 import { MissionAudio } from './mission-audio.js';
@@ -19,7 +19,7 @@ import { loadGameData, connectLocalBackend } from './local-backend.js';
 
 // Game code version. index.html carries the same value in <meta name="luna-build">; if they differ, the
 // browser is running a stale build next to newer files, which is reported on screen.
-const LUNA_VERSION='1.3.2';
+const LUNA_VERSION='1.3.3';
 // Problems are shown on screen (and in the console) instead of silently breaking buttons.
 const reportedProblems=new Set();
 function reportProblem(message){
@@ -317,28 +317,47 @@ function syncFlightEvent(p) {
   $('bus-down-state').textContent=cutOff||(ev.resolved&&isolate)&&since>=.5?'50%':'100%';
   card.setAttribute('aria-label',$('flight-event-title').textContent);
 }
-// Repair puzzle countdown. Runs on real time while the repair dialog is open (mission time stays paused).
+// Repair puzzle countdown: 45 s, then up to two +15 s extensions costing 3% suit oxygen each; after that the level
+// restarts. Runs on real time while the repair dialog is open (mission time stays paused). The clock belongs to the
+// puzzle, so closing and reopening the dialog pauses it but does not reset it.
 let puzzleTimer=null,puzzleCircuit=null;
 function puzzleOxygenPercent(){return Math.max(0,mission.state.oxygen/mission.config.suit.oxygenMinutes*100);}
+function extendPuzzleTime(){
+  if(!puzzleTimer?.canExtend||mission.state.status!=='repair')return;
+  puzzleTimer.extend();mission.spendOxygen(EXTENSION_OXYGEN_PERCENT/100*mission.config.suit.oxygenMinutes,'repair overtime');
+  if(mission.state.status==='failed'){$('repair-dialog').close();puzzleTimer=null;processEvents();updateUI();return;}
+  notice('+'+EXTENSION_SECONDS+' s on the repair clock · '+EXTENSION_OXYGEN_PERCENT+'% oxygen used','warning');beep(520,.08);
+  renderCircuit();updatePuzzleTimer(0);
+}
+function restartLevelAfterPuzzle(reason){
+  puzzleTimer=null;puzzleCircuit=null;circuitBoard=null;
+  if($('repair-dialog').open)$('repair-dialog').close();
+  mission.restartLevel();mission.reviewPassed=false;refreshLesson();processEvents();updateUI();
+  notice(reason,'warning');audio.cue?.('fail');
+}
 function updatePuzzleTimer(dt){
-  const open=$('repair-dialog').open&&mission.circuit&&mission.state.status==='repair';
-  if(!open){puzzleTimer=null;puzzleCircuit=null;return;}
-  if(!puzzleTimer||puzzleCircuit!==mission.circuit){puzzleTimer=new PuzzleTimer(puzzleTimeLimit(mission.repairType,!!mission.isTraining));puzzleCircuit=mission.circuit;}
-  const useOxygen=!!$('puzzle-oxygen').checked,result=puzzleTimer.update(dt,{useOxygen,paused:document.hidden});
-  if(result.type==='reset'){
-    mission.circuit.scramble(Math.floor((mission.state.time+puzzleTimer.resets*7919)*1000)%2147483647);renderCircuit();
-    $('puzzle-timer').dataset.tripped='';setTimeout(()=>{delete $('puzzle-timer').dataset.tripped;},1000);
-    $('circuit-feedback').textContent='Time up: the bus tripped and the wires scrambled. Try again.';beep(180,.25);
-  }
-  if(result.type==='overtime'){
-    mission.spendOxygen(result.oxygenMinutes,'repair overtime');
-    if(mission.state.status==='failed'){$('repair-dialog').close();puzzleTimer=null;processEvents();updateUI();return;}
+  if(!mission.circuit||mission.state.status!=='repair'){puzzleTimer=null;puzzleCircuit=null;$('puzzle-extend').hidden=true;return;}
+  if(!puzzleTimer||puzzleCircuit!==mission.circuit){puzzleTimer=new PuzzleTimer(puzzleTimeLimit(mission.repairType));puzzleCircuit=mission.circuit;}
+  if(!$('repair-dialog').open)return;
+  const before=puzzleTimer.state,result=puzzleTimer.update(dt,{paused:document.hidden});
+  if(result.type==='out'){restartLevelAfterPuzzle('Out of repair time after both extensions: the level starts again from the beginning.');return;}
+  if(result.type==='expired'&&before==='running'){
+    $('puzzle-timer').dataset.tripped='';setTimeout(()=>{delete $('puzzle-timer').dataset.tripped;},1000);beep(180,.25);renderCircuit();
+    setTimeout(()=>{if($('puzzle-extend').hidden)return;$('puzzle-extend').scrollIntoView?.({block:'nearest',behavior:'smooth'});$('puzzle-extend-button').focus?.({preventScroll:true});},50);
   }
   const level=puzzleTimer.level;$('puzzle-timer').dataset.level=level;$('puzzle-time').textContent=puzzleTimer.label();
   $('puzzle-timer-fill').style.transform='scaleX('+puzzleTimer.fraction.toFixed(4)+')';
-  $('puzzle-timer-note').textContent=level==='overtime'?'Overtime: every second costs one minute of suit oxygen.':useOxygen?'When the clock reaches zero you keep working, paying in suit oxygen.':'Finish before the bus trips, or the wires scramble and the clock restarts.';
-  const o2=puzzleOxygenPercent();$('puzzle-oxygen-level').textContent='O₂ '+o2.toFixed(o2<10?1:0)+'%';
+  const left=puzzleTimer.extensionsLeft,waiting=puzzleTimer.state==='expired';
+  $('puzzle-extend').hidden=!waiting;
+  if(waiting){
+    const o2=puzzleOxygenPercent();
+    $('puzzle-extend-text').textContent='Time’s up. Take '+EXTENSION_SECONDS+' more seconds for '+EXTENSION_OXYGEN_PERCENT+'% of your oxygen ('+o2.toFixed(0)+'% → '+Math.max(0,o2-EXTENSION_OXYGEN_PERCENT).toFixed(0)+'%), or restart the level. '+(left===1?'This is your last extension.':left+' extensions left.');
+    $('puzzle-extend-button').textContent='+'+EXTENSION_SECONDS+' s · uses '+EXTENSION_OXYGEN_PERCENT+'% O₂ ('+left+' left)';
+  }
+  $('puzzle-timer-note').textContent=waiting?'The board is locked until you choose.':puzzleTimer.extensions?'Extra time '+puzzleTimer.extensions+' of '+MAX_EXTENSIONS+'. '+(left?'One more extension is possible.':'If this runs out, the level restarts.'):'You have '+PUZZLE_TIME_SECONDS+' seconds. If time runs out you can buy '+EXTENSION_SECONDS+' more seconds for '+EXTENSION_OXYGEN_PERCENT+'% oxygen, twice.';
+  const o2=puzzleOxygenPercent();$('puzzle-oxygen-level').textContent=o2.toFixed(o2<10?1:0)+'%';
   if(o2<25)$('puzzle-oxygen-level').dataset.low='';else delete $('puzzle-oxygen-level').dataset.low;
+  $('puzzle-extensions').textContent=left?left+' × '+EXTENSION_SECONDS+' s':'none';
 }
 // Weather and ambience: pick the condition for the place the player is in, push it to the renderers,
 // show it on the HUD, and drive the ambient sound. Called from the frame loop (cheap).
@@ -521,6 +540,8 @@ function closeWorkbench(resume=true){
 function advanceLesson(){
   if(mission.isExpedition){$('debrief-dialog').close();openJourney();return;}
   if(mission.state.status!=='complete')return;
+  // The recap quiz must be passed before the next level: from the workbench or the next-action card, open it.
+  if(mission.awaitingRecap){closeWorkbench(false);showDebrief();return;}
   closeWorkbench(false);$('debrief-dialog').close();
   if(mission.nextLevel())refreshLesson();else{renderLevels();openDialog($('levels-dialog'));}
 }
@@ -612,59 +633,114 @@ function processEvents() {
     if (event.type === 'ended') { const success = mission.state.status === 'complete'; renderer.trigger(success ? 'victory' : 'fail', mission.state.player); audio.cue(success ? 'victory' : 'fail'); syncTutorial(); if(workbenchOpen&&success)updateWorkbench();else showDebrief(); }
   }
 }
+// Circuit board. Tiles are built once per puzzle; wires are drawn in their current position, and a click plays a
+// short 45° turn so the player sees which way the tile moved. Right-click or Shift+click turns it back.
+// Works for every board size (3×3 to 5×5).
+let circuitBoard=null,circuitTurned=null;
+const CIRCUIT_ENDS=[[30,0],[60,0],[60,30],[60,60],[30,60],[0,60],[0,30],[0,0]];
+function turnCircuitTile(i,direction){
+  const circuit=mission.circuit;if(!circuit||puzzleTimer?.state!=='running'&&puzzleTimer)return;
+  const was=circuit.powered().has(i);circuit.rotate(i,direction);circuitTurned={index:i,direction};
+  beep(370+(was?90:0)+(direction<0?-40:0),0.035);renderCircuit();
+}
 function renderCircuit() {
   const circuit = mission.circuit;
   if (!circuit) return;
   $('repair-title').innerHTML = mission.repairType === 'outpost' ? 'Reconnect Haven’s power bus<span>.</span>' : mission.repairType === 'relay' ? 'Restore the surface relay<span>.</span>' : 'Reconnect Echo’s power bus<span>.</span>';
   $('repair-description').textContent=circuit.instructions;
   $('circuit-design').textContent=circuit.name;$('circuit-frame').dataset.design=circuit.design;
+  $('circuit-frame').style.setProperty?.('--cols',String(circuit.cols));$('circuit-frame').style.setProperty?.('--rows',String(circuit.rows));
   for(const [id,endpoint] of [['circuit-input',circuit.input],['circuit-output',circuit.output]]){
     const position=circuit.terminalPosition(endpoint);$(id).style.gridRow=String(position.row);$(id).style.gridColumn=String(position.column);
   }
   $('circuit-grid').setAttribute('aria-label',circuit.name+'. '+circuit.instructions);
-  const powered = circuit.powered(), connected = circuit.connected(), endpoints = [[30, 0], [60, 30], [30, 60], [0, 30]];
-  $('circuit-grid').replaceChildren();
-  for (let i = 0; i < 9; i++) {
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'circuit-tile' + (powered.has(i) ? ' powered' : '');
-    button.setAttribute('aria-label', 'Rotate circuit tile ' + (i + 1));
-    const paths = circuit.connections(i).map(port => `<path d="M30 30 L${endpoints[port][0]} ${endpoints[port][1]}"/>`).join('');
-    button.innerHTML = `<svg viewBox="0 0 60 60" aria-hidden="true">${paths}<circle cx="30" cy="30" r="4" fill="currentColor" stroke="none"/></svg>`;
-    button.addEventListener('click', () => { circuit.rotate(i); beep(370 + (powered.has(i) ? 90 : 0), 0.035); renderCircuit(); $('circuit-grid').children[i].focus({ preventScroll: true }); });
-    $('circuit-grid').append(button);
+  const powered = circuit.powered(), connected = circuit.connected(), grid=$('circuit-grid'), count=circuit.ports.length;
+  if(circuitBoard!==circuit||grid.children.length!==count){
+    circuitBoard=circuit;circuitTurned=null;grid.replaceChildren();
+    for (let i = 0; i < count; i++) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'circuit-tile';
+      button.innerHTML = '<svg viewBox="0 0 60 60" aria-hidden="true"></svg>';
+      button.addEventListener('click', event => { turnCircuitTile(i,event.shiftKey?-1:1); grid.children[i]?.focus?.({ preventScroll: true }); });
+      button.addEventListener('contextmenu', event => { event.preventDefault(); turnCircuitTile(i,-1); });
+      grid.append(button);
+    }
+  }
+  for (let i = 0; i < count; i++) {
+    const button=grid.children[i];if(!button)continue;
+    button.classList.toggle('powered',powered.has(i));
+    button.setAttribute('aria-label', 'Circuit tile '+circuit.tileName(i)+', turned '+circuit.turns[i]*45+'°'+(powered.has(i)?', powered':'')+'. Click to turn 45° clockwise, right-click to turn back.');
+    const svg=button.querySelector?.('svg');if(!svg)continue;
+    svg.innerHTML=circuit.connections(i).map(port=>`<path d="M30 30 L${CIRCUIT_ENDS[port][0]} ${CIRCUIT_ENDS[port][1]}"/>`).join('')+'<circle cx="30" cy="30" r="4" fill="currentColor" stroke="none"/>';
+    if(circuitTurned?.index===i&&svg.animate&&!reducedMotion)svg.animate([{transform:'rotate('+(circuitTurned.direction<0?45:-45)+'deg)'},{transform:'rotate(0deg)'}],{duration:150,easing:'ease-out'});
   }
   $('circuit-feedback').textContent = connected ? 'Power path connected · ready to apply' : 'Connect input → output';
   $('circuit-feedback').style.color = connected ? '#ccebc0' : '#a6c2a5';
-  $('circuit-moves').textContent = circuit.moves + ' rotations';
-  $('output-indicator').classList.toggle('connected', connected); $('apply-repair').disabled = !connected;
+  circuitTurned=null;$('circuit-moves').textContent = circuit.moves + ' turns';
+  const waiting=!!puzzleTimer&&puzzleTimer.state!=='running';
+  $('circuit-frame').classList.toggle('locked',waiting);
+  $('output-indicator').classList.toggle('connected', connected); $('apply-repair').disabled = !connected||waiting;
 }
-// Recap quiz on the gist of the mission just finished (built from this run's own events).
+// Mission recap quiz: four questions on what just happened in this run. After a completed flight-school level it is
+// mandatory: at least 2 of 4 correct earns the badge and unlocks the next level. A wrong answer shows a hint and
+// gives one more try with the options in a new order. Every time the quiz is built the options are shuffled again.
+let currentRecap=null; // the quiz on screen (questions in their current option order), for tests and debugging
+function recapGates(d){return !!d.success&&!mission.isExpedition&&typeof mission.passRecap==='function';}
 function renderRecapQuiz(d){
-  const quiz=buildRecapQuiz(mission,d,{seed:Math.round(mission.state.time*13)+(d.decisions?.length||0),scenarios:pack?.scenarios}),answers=[];
-  $('recap-quiz').hidden=!quiz.questions.length;$('recap-title').textContent=quiz.title;$('recap-score').textContent='';
-  $('recap-questions').replaceChildren(...quiz.questions.map((q,qi)=>{
-    const item=document.createElement('li'),prompt=document.createElement('p'),options=document.createElement('div'),explain=document.createElement('p');
-    prompt.textContent=q.prompt;options.className='recap-options';explain.className='recap-explain';explain.hidden=true;
-    options.append(...q.options.map((text,oi)=>{const b=document.createElement('button');b.className='recap-option';b.type='button';b.textContent=text;
-      b.addEventListener('click',()=>{if(answers[qi]!==undefined)return;answers[qi]=oi;
-        for(const [k,o] of [...options.children].entries()){o.disabled=true;if(k===q.answer)o.dataset.result='correct';else if(k===oi)o.dataset.result='wrong';}
-        explain.textContent=(oi===q.answer?'✓ Correct. ':'Not quite. ')+q.explain;explain.hidden=false;audio.cue(oi===q.answer?'ready':'fail');
-        if(answers.filter(a=>a!==undefined).length===quiz.questions.length){const n=scoreRecap(quiz,answers);$('recap-score').textContent='Recap score: '+n+' / '+quiz.questions.length+(n===quiz.questions.length?' · you know exactly what happened out there.':n>=quiz.questions.length/2?' · good recall. Check the journal below for the rest.':' · read the journal below and try the mission again.');}
+  const quiz=buildRecapQuiz(mission,d,{seed:Math.floor(Math.random()*2147483646)+1,scenarios:pack?.scenarios}),results=[],gate=recapGates(d);
+  const passMark=quiz.passMark||2,tries=quiz.tries||2;currentRecap={quiz,live:[...quiz.questions],results};
+  $('recap-quiz').hidden=!quiz.questions.length;$('recap-title').textContent=quiz.title;$('recap-score').textContent='';$('recap-retry').hidden=true;
+  $('recap-intro').textContent=gate?'Answer at least '+passMark+' of '+quiz.questions.length+' correctly to earn your badge and continue. A wrong answer gives you a hint and one more try.':'Quick check on what just happened. A wrong answer gives you a hint and one more try.';
+  const finish=()=>{
+    const n=results.filter(Boolean).length,total=quiz.questions.length,passed=n>=passMark;
+    $('recap-score').textContent='Recap score: '+n+' / '+total+(passed?(n===total?' · you know exactly what happened out there.':' · passed.'):' · you need '+passMark+' correct to continue. Read the journal below, then try a new quiz.');
+    $('recap-score').dataset.result=passed?'pass':'fail';
+    if(!passed){$('recap-retry').hidden=false;audio.cue('fail');return;}
+    if(gate&&mission.awaitingRecap){mission.passRecap();audio.cue('victory');updateDebriefAfterRecap(d);syncAdvancement();updateUI();}
+  };
+  $('recap-questions').replaceChildren(...quiz.questions.map((original,qi)=>{
+    let q=original,attempt=0;
+    const item=document.createElement('li'),prompt=document.createElement('p'),options=document.createElement('div'),hint=document.createElement('p'),explain=document.createElement('p');
+    prompt.textContent=q.prompt;options.className='recap-options';hint.className='recap-hint';hint.hidden=true;explain.className='recap-explain';explain.hidden=true;
+    const wrongTexts=new Set();
+    const draw=()=>options.replaceChildren(...q.options.map((text,oi)=>{
+      const b=document.createElement('button');b.className='recap-option';b.type='button';b.textContent=text;
+      if(wrongTexts.has(text)){b.disabled=true;b.dataset.result='wrong';}
+      b.addEventListener('click',()=>{
+        if(results[qi]!==undefined||b.disabled)return;attempt++;
+        if(oi===q.answer){
+          results[qi]=true;for(const o of options.children){o.disabled=true;}b.dataset.result='correct';
+          explain.textContent=(attempt===1?'✓ Correct. ':'✓ Correct on the second try. ')+q.explain;explain.hidden=false;hint.hidden=true;audio.cue('ready');
+        }else if(attempt<tries){
+          wrongTexts.add(text);q=reshuffleQuestion(q);currentRecap.live[qi]=q;draw();
+          hint.textContent='Not quite. Hint: '+q.hint+' Try once more.';hint.hidden=false;audio.cue('fail');
+          options.querySelector?.('button:not(:disabled)')?.focus?.({preventScroll:true});
+        }else{
+          results[qi]=false;for(const [k,o] of [...options.children].entries()){o.disabled=true;if(k===q.answer)o.dataset.result='correct';}b.dataset.result='wrong';
+          hint.hidden=true;explain.textContent='The answer was “'+q.options[q.answer]+'”. '+q.explain;explain.hidden=false;audio.cue('fail');
+        }
+        if(results.filter(r=>r!==undefined).length===quiz.questions.length)finish();
       });return b;}));
-    item.append(prompt,options,explain);return item;
+    draw();item.append(prompt,options,hint,explain);return item;
   }));
+}
+function updateDebriefAfterRecap(d){
+  $('debrief-title').textContent='Level complete. Badge earned.';$('debrief-rank').textContent=mission.rank;
+  $('debrief-description').textContent=mission.lesson.badge+' earned by completing '+mission.lesson.title+'. '+(mission.courseComplete?'Your training course is complete.':'The next level is unlocked. Continue below, or try the optional 100 XP question.');
+  $('skill-check').hidden=!d.success;
 }
 function showDebrief() {
   if(mission.isExpedition){showExpeditionDebrief();return;}
   const d = mission.debrief();
   $('debrief-dialog').dataset.success = String(d.success);
-  $('debrief-title').textContent = d.success ? 'Level complete. Badge earned.' : 'Every explorer learns.';
-  $('debrief-description').textContent = d.success ? mission.lesson.badge+' earned by completing '+mission.lesson.title+'. '+(mission.courseComplete?'Your training course is complete.':'The next level is unlocked. Continue below, or try the optional 100 XP question.') : d.failureReason+'. Retry this lesson with a safer route. Previously earned badges are kept.';
+  const awaiting=d.success&&mission.awaitingRecap;
+  $('debrief-title').textContent = awaiting ? 'Field tasks complete. One last step.' : d.success ? 'Level complete. Badge earned.' : 'Every explorer learns.';
+  $('debrief-description').textContent = awaiting ? 'Pass the mission recap quiz below (at least 2 of 4 correct) to earn '+mission.lesson.badge+(mission.levelIndex<mission.academy.levels.length-1?' and unlock level '+(mission.levelIndex+2):'')+'.' : d.success ? mission.lesson.badge+' earned by completing '+mission.lesson.title+'. '+(mission.courseComplete?'Your training course is complete.':'The next level is unlocked. Continue below, or try the optional 100 XP question.') : d.failureReason+'. Retry this lesson with a safer route. Previously earned badges are kept.';
   $('debrief-emblem').textContent = d.success ? '✦' : '↻'; $('debrief-rank').textContent = d.success?mission.rank:mission.lesson.skill;
   const metrics = [[d.timeMinutes.toFixed(1), 'MISSION MINUTES'], [d.distanceKm.toFixed(2) + ' km', 'DISTANCE TRAVELLED'], [mission.science.length?d.scans+' / '+mission.science.length:'—', 'TERRAIN OBSERVATIONS'], [d.oxygenPercent.toFixed(0) + '%', 'OXYGEN RETURNED'], [String(d.repairs), 'SYSTEMS RESTORED'], [String(d.success?d.score:0), 'LESSON POINTS']];
   $('debrief-metrics').replaceChildren();
   for (const [value, label] of metrics) { const div = document.createElement('div'), strong = document.createElement('strong'), span = document.createElement('span'); strong.textContent = value; span.textContent = label; div.append(strong, span); $('debrief-metrics').append(div); }
   $('debrief-learning').textContent = d.success ? 'Skill demonstrated: '+mission.lesson.skill+'. '+mission.lesson.explanation : 'Longer routes, waiting in the field, and sprinting affect your reserves. Go to objective follows a calculated terrain route. Watch the Lifeline before taking a detour.';
-  $('skill-check').hidden=!d.success;
+  $('skill-check').hidden=!d.success||!!mission.awaitingRecap;
   $('review-question').textContent=mission.lesson.question;
   $('review-feedback').textContent=mission.reviewPassed?'✓ '+mission.lesson.badge+' earned. '+mission.lesson.explanation:'';
   $('review-answers').replaceChildren(...mission.lesson.answers.map((answer,i)=>{
@@ -682,7 +758,7 @@ function showDebrief() {
   openDialog($('debrief-dialog'));
 }
 function syncAdvancement() {
-  $('next-level-button').hidden=mission.state.status!=='complete';
+  $('next-level-button').hidden=mission.state.status!=='complete'||!!mission.awaitingRecap;
   $('next-level-button').textContent=mission.levelIndex===mission.academy.levels.length-1?'View training record →':'Start level '+(mission.levelIndex+2)+' →';
   $('course-certificate').hidden=!mission.courseComplete;
   $('course-certificate').textContent=mission.courseComplete?'QUALIFIED JUNIOR ASTRONAUT · '+mission.xp+' XP · All '+mission.academy.levels.length+' practical skills completed: '+mission.academy.levels.map(l=>l.badge).join(' · '):'';
@@ -910,10 +986,13 @@ function setupEvents() {
   $('music-volume').addEventListener('input', () => { audio.setVolume(Number($('music-volume').value) / 100); audio.activate(); syncSettings(); });
   $('motion-button').addEventListener('click', () => { reducedMotion = !reducedMotion; writePreference('luna-motion-v1', reducedMotion, storage); renderer.clearEffects(); syncSettings(); });
   $('opening-toggle').addEventListener('click',()=>{story.setEnabled(!story.enabled);syncSettings();});
+  $('puzzle-extend-button').addEventListener('click',extendPuzzleTime);
+  $('puzzle-restart-button').addEventListener('click',()=>restartLevelAfterPuzzle('Level restarted from the beginning.'));
+  $('recap-retry').addEventListener('click',()=>{renderRecapQuiz(mission.debrief());$('recap-questions').querySelector?.('button')?.focus?.({preventScroll:true});});
   $('apply-repair').addEventListener('click', () => {
     if (mission.completeRepair()) { $('repair-dialog').close(); processEvents(); updateUI(); }
   });
-  $('replay-button').addEventListener('click',()=>{$('debrief-dialog').close();mission.replayCheckpoint();mission.reviewPassed=false;refreshLesson();processEvents();updateUI();});
+  $('replay-button').addEventListener('click',()=>{$('debrief-dialog').close();mission.replayCheckpoint();mission.reviewPassed=false;mission.recapPassed=false;refreshLesson();processEvents();updateUI();});
   $('restart-button').addEventListener('click',()=>{$('debrief-dialog').close();mission.reset();refreshLesson();});
   $('next-level-button').addEventListener('click',advanceLesson);
   document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
@@ -1078,7 +1157,7 @@ function showExpeditionDebrief(){
  const d=mission.debrief(),f=d.forecast;$('debrief-dialog').dataset.success=String(d.success);$('debrief-title').textContent=d.success?'Mission secured. Crew protected.':'Mission review: try a new plan.';$('debrief-description').textContent=d.success?mission.scenario.title+' complete. The relay is restored, the science goal is met, and the crew has a calculated four-hour resupply margin.':mission.state.failureReason+'. Replay the last checkpoint or restart the mission.';$('debrief-emblem').textContent=d.success?'✦':'↻';$('debrief-rank').textContent=mission.rank;
  $('debrief-metrics').replaceChildren(...[[d.minutes.toFixed(1),'MISSION MINUTES'],[d.distanceKm.toFixed(2)+' km','DISTANCE'],[d.science+' / '+mission.scenario.minimumScience,'SCIENCE'],[d.outpost.energy.toFixed(1)+' kWh','BATTERY'],[d.outpost.health.toFixed(0)+'%','CREW HEALTH'],[d.decisions.length+' / 7','DECISIONS']].map(([value,label])=>{const n=document.createElement('div'),v=document.createElement('strong'),l=document.createElement('span');v.textContent=value;l.textContent=label;n.append(v,l);return n;}));
  $('debrief-learning').textContent='Resupply forecast in '+f.hours+' hours: '+f.final.oxygen.toFixed(1)+' crew·h oxygen, '+f.final.water.toFixed(1)+' L water, '+f.final.food.toFixed(1)+' food portions, '+f.final.energy.toFixed(1)+' kWh, '+f.final.health.toFixed(0)+'% health. '+d.learning+' Forecast keeps the current sunlight and operating plan.';$('skill-check').hidden=true;$('course-certificate').hidden=!d.success;$('course-certificate').textContent=d.success?mission.scenario.badge+' · '+mission.xp+' XP':'';$('next-level-button').hidden=false;$('next-level-button').textContent='Choose another journey →';
- $('debrief-journal').replaceChildren(...d.decisions.map(entry=>{const row=document.createElement('div'),name=document.createElement('strong'),text=document.createElement('span');row.className='debrief-decision';name.textContent=entry.title;text.textContent=entry.label+' · '+entry.minutes+' mission minutes · effects '+Object.entries(entry.effects).map(([k,v])=>k+': '+v).join(', ');row.append(name,text);return row;}));renderRecapQuiz(d);openDialog($('debrief-dialog'));
+ $('debrief-journal').replaceChildren(...d.decisions.map(entry=>{const row=document.createElement('div'),name=document.createElement('strong'),text=document.createElement('span');row.className='debrief-decision';name.textContent=entry.title;text.textContent=entry.label+' · '+entry.minutes+' mission minutes · effects '+Object.entries(entry.effects).map(([k,v])=>k+': '+v).join(', ');row.append(name,text);return row;}));renderRecapQuiz(d);renderRecapQuiz({...d,journal:d.journal||mission.state.journal,oxygenPercent:d.oxygenPercent});openDialog($('debrief-dialog'));
 }
 function replaceSurfaceMission(destination,mode){
  keys.clear();flightRenderer.dispose();renderer.dispose?.();mission=createDestinationMission(pack,destination,storage,mode,astro);renderer=new Renderer($('world'),mission);if(flight.phase==='surface')renderer.showLandedCraft?.();flightRenderer=new FlightRenderer(renderer,flight,pack.solar);if(astro)flightRenderer.showOrbitLines=$('orbit-lines').checked;tutorial=new AcademyGuide(mission,storage);window.luna.mission=mission;window.luna.renderer=renderer;window.luna.tutorial=tutorial;displayedLesson='';const rect=$('world').getBoundingClientRect();renderer.resize(rect.width,rect.height,window.devicePixelRatio||1);applyGraphics();refreshLesson();buildSources();
@@ -1122,7 +1201,6 @@ function setupExpeditionEvents(){
  $('graphics-quality').value=readPreference('luna-graphics-v1','balanced',storage);graphicsQuality=$('graphics-quality').value;
  $('graphics-quality').addEventListener('change',()=>{graphicsQuality=$('graphics-quality').value;writePreference('luna-graphics-v1',graphicsQuality,storage);applyGraphics();});
  weatherMode=readPreference('luna-weather-v1','auto',storage);$('weather-mode').value=weatherMode;$('weather-mode').addEventListener('change',()=>{weatherMode=$('weather-mode').value;writePreference('luna-weather-v1',weatherMode,storage);syncWeather(0);});
- $('puzzle-oxygen').checked=readPreference('luna-puzzle-oxygen-v1',false,storage)===true;$('puzzle-oxygen').addEventListener('change',()=>{writePreference('luna-puzzle-oxygen-v1',$('puzzle-oxygen').checked,storage);updatePuzzleTimer(0);});
  $('orbit-lines').checked=readPreference('luna-orbits-v1',true,storage)!==false;flightRenderer.showOrbitLines=$('orbit-lines').checked;$('orbit-lines').addEventListener('change',()=>{flightRenderer.showOrbitLines=$('orbit-lines').checked;writePreference('luna-orbits-v1',$('orbit-lines').checked,storage);});
  $('solar-body').replaceChildren(...Object.entries(astro.data.bodies).map(([name,body])=>{const option=document.createElement('option');option.value=name;option.textContent=name+' · '+body.kind;return option;}));$('solar-body').value='Earth';
  $('solar-probe').addEventListener('click',()=>{flightRenderer.probeBody=$('solar-body').value;flightRenderer.lookYaw=0;flightRenderer.lookPitch=0;$('solar-labels').hidden=true;notice('Scientific probe: apparent body size is preserved. Drag to look around. Gas and ice giants have no surface landing.');});
@@ -1158,7 +1236,7 @@ async function boot() {
     reducedMotion = readPreference('luna-motion-v1', systemReduced, storage) === true;
     setupEvents(); buildSources(); loadDonkiContext(); updateUI(); $('loading').hidden = true;openStory();
     // Kept for development and reproducible engine inspection, not used by gameplay.
-    window.luna = { mission, renderer, tutorial, audio, story,flight,astro };syncFlight();
+    window.luna = { mission, renderer, tutorial, audio, story,flight,astro, get recap(){return currentRecap;} };syncFlight();
     requestAnimationFrame(animate);
   } catch (error) {
     console.error(error);
