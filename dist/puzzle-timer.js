@@ -1,40 +1,41 @@
 // Countdown for the circuit-repair puzzles.
-// Default rule: when time runs out the bus trips, the wires scramble and the countdown restarts.
-// With "Use more oxygen to solve the puzzle" switched on, the player keeps working in overtime instead,
-// and every overtime second costs suit oxygen.
+// Every puzzle gets 45 seconds. When the clock runs out the player may buy 15 more seconds for 3% of the suit's
+// oxygen, at most twice. If the time runs out after both extensions, the level restarts from its initial state.
 
-export const PUZZLE_TIME_LIMITS = { relay: 60, rover: 75, outpost: 90 };
-export const TRAINING_TIME_FACTOR = 1.5;          // flight-school lessons are for learning: 50% more time
-export const OXYGEN_MINUTES_PER_OVERTIME_SECOND = 1; // overtime cost, in minutes of suit oxygen
+export const PUZZLE_TIME_SECONDS = 45;
+export const EXTENSION_SECONDS = 15;
+export const EXTENSION_OXYGEN_PERCENT = 3;   // percentage points of a full suit oxygen supply
+export const MAX_EXTENSIONS = 2;
 
-export function puzzleTimeLimit(repairType, training = false) {
-  const base = PUZZLE_TIME_LIMITS[repairType] ?? PUZZLE_TIME_LIMITS.rover;
-  return Math.round(base * (training ? TRAINING_TIME_FACTOR : 1));
-}
+// Kept as a function so callers do not need to know the rule; every repair type has the same limit.
+export function puzzleTimeLimit() { return PUZZLE_TIME_SECONDS; }
 
 export class PuzzleTimer {
-  constructor(limitSeconds) { this.limit = limitSeconds; this.restart(); this.resets = 0; }
-  restart() { this.remaining = this.limit; this.overtime = 0; }
-  get expired() { return this.remaining <= 0; }
-  get fraction() { return Math.max(0, this.remaining) / this.limit; }
-  get level() { return this.expired ? 'overtime' : this.fraction <= .1 ? 'danger' : this.fraction <= .3 ? 'warning' : 'ok'; }
+  constructor(limitSeconds = PUZZLE_TIME_SECONDS) {
+    this.limit = limitSeconds; this.segment = limitSeconds; this.remaining = limitSeconds;
+    this.extensions = 0; this.state = 'running';   // 'running' | 'expired' (waiting for a choice) | 'out'
+  }
+  get extensionsLeft() { return MAX_EXTENSIONS - this.extensions; }
+  get canExtend() { return this.state === 'expired' && this.extensionsLeft > 0; }
+  get fraction() { return Math.max(0, this.remaining) / this.segment; }
+  get level() { return this.state !== 'running' ? 'expired' : this.extensions ? 'extra' : this.fraction <= .15 ? 'danger' : this.fraction <= .35 ? 'warning' : 'ok'; }
   // Advance by dt seconds of real time. Returns what happened this step:
-  //   { type: 'running' } | { type: 'reset' } | { type: 'overtime', oxygenMinutes }
-  update(dt, { useOxygen = false, paused = false } = {}) {
-    if (paused || !(dt > 0)) return { type: 'running' };
-    if (!this.expired) {
-      this.remaining -= dt;
-      if (!this.expired) return { type: 'running' };
-      const spill = -this.remaining; this.remaining = 0;
-      if (!useOxygen) { this.resets++; this.restart(); return { type: 'reset' }; }
-      dt = spill;
-    } else if (!useOxygen) { this.resets++; this.restart(); return { type: 'reset' }; }
-    this.overtime += dt;
-    return { type: 'overtime', oxygenMinutes: dt * OXYGEN_MINUTES_PER_OVERTIME_SECOND };
+  //   { type: 'running' } | { type: 'expired' } (an extension can be bought) | { type: 'out' } (restart the level)
+  update(dt, { paused = false } = {}) {
+    if (this.state !== 'running' || paused || !(dt > 0)) return { type: this.state === 'running' ? 'running' : 'waiting' };
+    this.remaining -= dt;
+    if (this.remaining > 0) return { type: 'running' };
+    this.remaining = 0; this.state = this.extensionsLeft > 0 ? 'expired' : 'out';
+    return { type: this.state };
+  }
+  // Buys one extension. Returns false when none is left or the clock is still running.
+  extend() {
+    if (!this.canExtend) return false;
+    this.extensions++; this.segment = EXTENSION_SECONDS; this.remaining = EXTENSION_SECONDS; this.state = 'running';
+    return true;
   }
   label() {
-    const s = this.expired ? Math.floor(this.overtime) : Math.ceil(Math.max(0, this.remaining));
-    const text = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-    return this.expired ? '+' + text + ' overtime' : text;
+    const s = Math.ceil(Math.max(0, this.remaining));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + (this.extensions && this.state === 'running' ? ' extra' : '');
   }
 }
