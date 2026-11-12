@@ -40,6 +40,10 @@ export class ExpeditionMission extends TrainingMission {
  get courseComplete(){return this.state.status==='complete';}
  save(){if(!this.scenario)return;}
  loadLevel(index){return this.scenario?false:super.loadLevel(index);}
+ // Later expedition stages get harder circuits (power stage 4×4, relay stage 5×5).
+ circuitDifficulty(){return 2+Math.round(this.state.expedition.stage*.75);}
+ // The start of an expedition stage is its checkpoint.
+ restartLevel(){if(this.checkpoint){this.replayCheckpoint();return true;}this.reset();return true;}
  newExpedition(){
   this.objects=copy(this.original.objects);this.science=copy(this.original.science).slice(0,1);this.science[0].name=this.config.world==='moon'?'BASALT SAMPLE':'JEZERO SCIENCE';
   // Keep the practical sample reachable without a multi-kilometre detour.
@@ -63,7 +67,7 @@ export class ExpeditionMission extends TrainingMission {
   if(this.state.status!=='playing')return;const near=this.nearby();if(!near){this.notify('Follow the gold objective. Use Go to objective or WASD, then E beside the equipment.');return;}
   if(near.type==='expedition'){
    this.route=null;if(this.stage.location==='base')this.state.training.inside=true;
-   if(this.stage.task==='circuit'&&!this.state.expedition.taskDone){this.repairType=this.stage.location==='relay'?'relay':'outpost';this.circuit=new Circuit(this.config.seed+this.state.expedition.stage*31,this.repairType);this.state.status='repair';this.events.push({type:'repair'});}
+   if(this.stage.task==='circuit'&&!this.state.expedition.taskDone){this.repairType=this.stage.location==='relay'?'relay':'outpost';this.circuit=new Circuit(this.config.seed+this.state.expedition.stage*31,this.repairType,this.circuitDifficulty(this.repairType));this.state.status='repair';this.events.push({type:'repair'});}
    else this.events.push({type:'decision'});return;
   }super.interact();
  }
