@@ -11,7 +11,14 @@
     "radiationHealthLossPerMsv": 0.5,
     "evaOxygenReserveMinutes": 20,
     "evaBatteryReserveWh": 18,
+<<<<<<< HEAD
+    "resupplyHours": 4,
+    "cropCycleHours": 6,
+    "cropHarvestPortions": 2,
+    "earthMessageEnergyKwh": 0.15
+=======
     "resupplyHours": 4
+>>>>>>> origin/main
   },
   "moon": {
     "id": "tranquillitatis-haven",
@@ -45,7 +52,13 @@
       "science": 0,
       "leak": true,
       "relay": false,
+<<<<<<< HEAD
+      "suitFactor": 1,
+      "growthHours": 0,
+      "harvests": 0
+=======
       "suitFactor": 1
+>>>>>>> origin/main
     },
     "stages": [
       {
@@ -161,13 +174,21 @@
           },
           {
             "id": "active",
+<<<<<<< HEAD
+            "label": "Use the experimental powered shield",
+=======
             "label": "Activate the powered shelter system",
+>>>>>>> origin/main
             "minutes": 3,
             "effects": {
               "shield": "active",
               "shieldKw": 3
             },
+<<<<<<< HEAD
+            "explanation": "An experimental teaching concept: uses extra power to reduce modelled exposure. This is not flight-ready protection; passive shelter is the established strategy in this exercise."
+=======
             "explanation": "The exercise lowers habitat exposure more, but takes 3 kW from the bus."
+>>>>>>> origin/main
           },
           {
             "id": "none",
@@ -337,7 +358,11 @@
           },
           {
             "id": "science",
+<<<<<<< HEAD
+            "label": "Use the experimental powered shield",
+=======
             "label": "Keep the laboratory and shielding running",
+>>>>>>> origin/main
             "minutes": 4,
             "effects": {
               "foodKw": 3.5,
@@ -345,7 +370,11 @@
               "shield": "active",
               "science": 10
             },
+<<<<<<< HEAD
+            "explanation": "An experimental teaching concept: uses extra power to reduce modelled exposure. This is not flight-ready protection; passive shelter is the established strategy in this exercise."
+=======
             "explanation": "Higher science output increases power demand during the wait."
+>>>>>>> origin/main
           },
           {
             "id": "generator",
@@ -395,7 +424,13 @@
       "science": 0,
       "leak": true,
       "relay": false,
+<<<<<<< HEAD
+      "suitFactor": 1,
+      "growthHours": 0,
+      "harvests": 0
+=======
       "suitFactor": 1
+>>>>>>> origin/main
     },
     "stages": [
       {
@@ -689,7 +724,11 @@
           },
           {
             "id": "science",
+<<<<<<< HEAD
+            "label": "Use the experimental powered shield",
+=======
             "label": "Keep the laboratory and shielding running",
+>>>>>>> origin/main
             "minutes": 4,
             "effects": {
               "foodKw": 3.5,
@@ -697,7 +736,11 @@
               "shield": "active",
               "science": 10
             },
+<<<<<<< HEAD
+            "explanation": "An experimental teaching concept: uses extra power to reduce modelled exposure. This is not flight-ready protection; passive shelter is the established strategy in this exercise."
+=======
             "explanation": "Higher science output increases power demand during the wait."
+>>>>>>> origin/main
           },
           {
             "id": "generator",

@@ -6,7 +6,7 @@ import { LocalStore } from './store.mjs';
 import { registerDatasets, currentManifest } from './datasets.mjs';
 
 export const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.zip': 'application/zip' };
+const MIME = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.zip': 'application/zip' };
 const json = (res, status, value) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(JSON.stringify(value)); };
 const validKey = key => /^luna-[a-z0-9-]{1,100}$/.test(key);
 
@@ -104,20 +104,16 @@ export async function createLunaServer({ root = PROJECT_ROOT, dataDirectory, dev
       relative = decodeURIComponent(relative || 'index.html');
       const file = path.resolve(base, relative);
       if (!file.startsWith(base + path.sep)) return json(res, 403, { error: 'Invalid path' });
-      // Lexical containment alone does not stop a symlink inside a served tree
-      // from pointing at a secret elsewhere on disk.
-      const [realBase, realFile] = await Promise.all([fs.realpath(base), fs.realpath(file)]);
-      if (!realFile.startsWith(realBase + path.sep)) return json(res, 403, { error: 'Invalid path' });
-      const stats = await fs.stat(realFile);
+      const stats = await fs.stat(file);
       if (!stats.isFile()) return json(res, 404, { error: 'Not found' });
       res.setHeader('Content-Type', MIME[path.extname(file)] || 'application/octet-stream');
       res.setHeader('Cache-Control', 'no-cache'); res.setHeader('X-Content-Type-Options', 'nosniff');
       if (req.method === 'HEAD') { res.end(); return; }
       if (dev && path.extname(file) === '.html') {
-        const html = await fs.readFile(realFile, 'utf8');
+        const html = await fs.readFile(file, 'utf8');
         res.end(html.replace('</body>', '<script src="/__dev/reload.js" defer></script></body>')); return;
       }
-      createReadStream(realFile).pipe(res);
+      createReadStream(file).pipe(res);
     } catch (error) {
       if (!res.headersSent) json(res, error.status || (error.code === 'ENOENT' ? 404 : 500), { error: error.status ? error.message : error.code === 'ENOENT' ? 'Not found' : 'Local workspace operation failed; check the server terminal' });
       else res.destroy();

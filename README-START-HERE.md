@@ -1,94 +1,67 @@
-# LUNA — start here in Visual Studio Code
+# LUNA — merged edition 1.3.1
 
-This folder contains the latest Moon/Mars game, an automatic development build,
-a working localhost data/save backend, NASA update tools and optional Supabase
-publishing configuration. Version: **1.2.3-local**, with a full-window opening, draggable launch/boarding views,
-coherent launch lighting and a corrected coastline.
+This is the complete editable game, using Local Workspace as the foundation and adding Academy's guidance, greenhouse and audio approach. Start with the story, select Moon or Mars, fly and land Odyssey, then operate Haven. Four crew share one outpost. The separate ten-lesson academy remains available on each world.
 
-## First run
+## Windows: quick play
 
-1. Install Node.js 22 or newer. Node.js 24 LTS is a suitable choice.
-2. Extract the ZIP. Open the inner **LUNA** folder in VS Code; it contains
-   `package.json`. You can also open `LUNA.code-workspace`.
+1. Install Node.js 22 or newer if it is not installed.
+2. Extract the ZIP using **Extract All**. Open the extracted **LUNA-Merged** folder in VS Code. `package.json` must be directly inside the folder you open.
 3. Open **Terminal → New Terminal** and run:
 
-```sh
-npm ci
-npm run dev
+```powershell
+npm.cmd start
 ```
 
-4. Open **http://localhost:3000** to play.
-5. Open **http://localhost:3000/workspace** to inspect local data and save backups.
+4. Open **http://localhost:3000** in Chrome, Edge or Firefox with WebGL 2 available. Leave the terminal running. Stop with **Ctrl+C**.
+5. Click **Begin story with music** to unlock audio. Or choose **Watch without music** / **Skip story →**. Browsers require this click before sound starts. There is no voice-over; read the captions.
 
-Keep the terminal running. Save a source edit and the client rebuilds; after a
-successful build, the browser reloads. Stop the server with **Ctrl+C**. A reload
-restarts the opening/flight session; outpost checkpoint saves remain available.
+The prepared bundle needs no `npm install` for quick play. Python is not required to play. The existing game requires WebGL 2; unsupported browsers display an explanation rather than a software substitute.
 
-For a quick run of the supplied prepared game, `npm start` works without installing
-dependencies. It includes the local backend but does not watch code edits.
+## Windows: edit the source
 
-If PowerShell blocks `npm.ps1`, use `npm.cmd ci` and `npm.cmd run dev`, or select
-Command Prompt as the VS Code terminal profile. No execution-policy change is needed.
+From the same folder:
 
-## Where to edit
+```powershell
+npm.cmd ci
+npm.cmd run dev
+```
 
-The established game source lives directly in `dist/`. The name is retained to
-avoid moving and breaking the existing multi-file project.
+Open **http://localhost:3000**. Saving client code triggers a rebuild and reload. A reload restarts the story/flight; completed outpost decisions and saved checkpoints remain available. Restart the terminal process after changing backend code.
 
-| Location | Edit here for |
-| --- | --- |
-| `dist/app.js` | Screens, controls, interactions and application flow |
-| `dist/styles.css`, `dist/index.html` | Visual layout and styling |
-| `dist/models.js`, `dist/render-3d.js` | 3D models, cameras and surface rendering |
-| `dist/flight-renderer.js`, `dist/landing-scene.js` | Departure, boarding, cockpit and landing scenes |
-| `dist/reference-landscape.js`, `dist/reference-geometry.js` | Moon/Mars authored relief |
-| `dist/lunar-surface.js`, `dist/surface-materials.js` | Lunar dust, rocks, tread impressions and material shaders |
-| `dist/expedition.js`, `dist/data/scenarios.json` | Outpost missions and teaching rules |
-| `dist/data/*.json` | Terrain, astronomy, catalogue and mission inputs |
-| `backend/` | Local API, validation, persistence and Supabase setup |
-| `tools/` | Development server, build, data acquisition and updates |
+To make a distributable bundle after editing:
 
-`dist/game.js` and `dist/luna-playable.html` are generated files. Make changes in
-source files and rebuild them. Backend or tool edits require a server restart.
+```powershell
+npm.cmd run build
+npm.cmd start
+```
 
-## Commands
+Use `.cmd` in PowerShell to avoid an `npm.ps1` execution-policy problem. No policy change is needed. On macOS/Linux use `npm` instead of `npm.cmd`.
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Build, serve and reload the client while editing |
-| `npm start` | Run the prepared game and localhost backend |
-| `npm test` | Run game and backend tests |
-| `npm run check` | Check JavaScript syntax |
-| `npm run build` | Generate the client bundle and standalone offline game |
-| `npm run data:register` | Validate and publish local data changes |
-| `npm run data:check` | Check NASA source release headers; Python required |
-| `npm run data:watch` | Repeat source checks while the terminal stays open |
-| `npm run data:refresh` | Download supported inputs into a staging pack, then validate |
-| `npm run cloud:publish` | Publish prepared assets to your configured Supabase project |
+## Verify
 
-After `npm ci`, press **F5** and select **LUNA: develop and open browser** to run
-through VS Code's debugger. The supplied tasks also appear in **Terminal → Run Task**.
+```powershell
+npm.cmd test
+npm.cmd run check
+npm.cmd run data:test
+```
 
-## Local saves and configuration
+The last command requires Python 3. It tests data preparation, not online NASA availability.
 
-The server creates `backend/data/` on first run. Preserve it when updating the
-project. It contains disk backups of settings and checkpoints, immutable data
-objects and pack manifests. The local backend supports one local profile; browser
-storage remains the offline fallback.
+## Included guides
 
-Cloud credentials are optional. Copy `.env.example` to `.env` only when changing
-ports, Python settings, NASA scheduling or configuring Supabase. The included SQL
-and publisher prepare the cloud data store; cloud login/progress sync remains a
-separate integration. Read `backend/README.md` for the exact setup and boundaries.
+- `HOW_TO_PLAY.md`: beginner walkthrough and controls.
+- `CHANGES.md`: exact changed files and relevant functions/classes.
+- `FEATURE_ORIGINS.md`: features preserved from Local and adapted from Academy.
+- `NASA_AND_MODELS.md`: sources, editable assumptions and scientific limits.
+- `QA_REPORT.md`: actual tests and unverified graphics/audio checks.
+- `backend/README.md`: local API, data versions, save backups and optional cloud setup.
 
-## Keep your local code updated
+The editable source lives in `dist/`, matching the original project's layout. Do not directly edit generated `dist/game.js` or `dist/luna-playable.html`.
 
-Work in this same folder and use `npm run dev` while editing. The server uses the
-local files you save; downloading another ZIP does not automatically merge it
-with your edits. Use Git commits for source history if desired. `.gitignore`
-excludes dependencies, credentials and local save files.
+## Offline play and saves
 
-Before replacing the folder with a future version, stop the server and preserve
-`backend/data/` and your own `.env`. After a source update, run `npm ci`, the checks
-and `npm run dev` again. Open `README.md` for the game controls and
-`DATA-INTEGRATION.md` for scientific data formats.
+`dist/luna-playable.html` contains the client and datasets; music is generated live in the browser. It can be opened directly; using `npm.cmd start` is recommended because it also provides the local save API and workspace dashboard at **http://localhost:3000/workspace**. Some browsers restrict local-file storage.
+
+Moon and Mars checkpoints retain their existing schema-2 keys. Older saves receive empty message/guide histories and a zero crop-progress counter when loaded; resources and stage are preserved. Academy's separate Python-engine saves cannot be imported because its turns and crew assumptions differ. This merge does not run that second engine.
+
+The local Node server creates `backend/data/` on first start. Keep that folder and the same browser profile to retain progress. It is excluded from this release to avoid shipping developer test saves. Back it up before replacing an older installation.

@@ -33,3 +33,8 @@ source of data and imagery; fictional crew/outposts and mission events are game
 content. No NASA endorsement is claimed.
 
 Final approach reuses the authored reference landscape and outpost meshes. The curved 30 km background continues cropped elevations beyond cached coverage; it is an illustrative horizon. Landing exhaust, ballistic grains and added spacecraft panel details are original game assets.
+
+
+## Merged edition additions
+
+The visible greenhouse was adapted from the supplied Outpost Academy project. Background music uses the original procedural composition in `dist/audio.js`. The game ships no voice recordings or speech synthesis. See `NASA_AND_MODELS.md` for audio and scientific limitations.

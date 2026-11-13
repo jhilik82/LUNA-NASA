@@ -10,6 +10,7 @@ export function createWorldLayout(mission) {
     { id: 'airlock', kind: 'airlock', x: b.x - .36, y: b.y - 1.1, halfX: .30, halfY: .44 },
     { id: 'solar', kind: 'solar', x: b.x - 1.1, y: b.y + 1.2, halfX: .8, halfY: .43 },
     { id: 'tank', kind: 'tank', x: b.x - 2.25, y: b.y + .5, halfX: .33, halfY: .33 },
+    { id:'greenhouse',kind:'greenhouse',x:b.x+4.2,y:b.y+2.8,halfX:.78,halfY:.55 },
     { id: 'lab', kind: 'lab', x: b.x + 1.7, y: b.y - 1.1, halfX: .50, halfY: .38 },
     { id: 'relay', kind: 'relay', x: r.x - .70, y: r.y - .64, halfX: .40, halfY: .40 },
     { id: 'relay-panel', kind: 'solar', x: r.x - 1.6, y: r.y - .7, halfX: .6, halfY: .4 }
