@@ -5,12 +5,13 @@ import { AcademyGuide } from './academy-guide.js';
 import { Soundtrack } from './audio.js';
 import { readPreference, writePreference } from './preferences.js';
 import { MovablePanel } from './panels.js';
-import { resolveRouteRequest, planSurfaceRoute } from './navigation.js';
 import { StorySequence } from './story.js';
 import { FlightSimulation, WORLDS, localSky } from './voyage.js';
 import { FlightRenderer } from './flight-renderer.js';
 import { AstronomicalWorld } from './astronomy-world.js';
 import { powerBalance } from './expedition.js';
+import { runAstraTool, createAstraMissionView, createAstraMonitor } from './astra-tools.js';
+import { astraReply } from './astra-chat.js';
 import { createDestinationMission } from './worlds.js';
 import { loadGameData, connectLocalBackend } from './local-backend.js';
 
@@ -20,7 +21,8 @@ let localSortieState=null;
 let astro=null,gameMode='training',graphicsQuality='balanced',explorationRenderTime=0;
 let pack, flight, flightRenderer, previousFlightPhase='', surfaceResumeStatus=null, skyHolding=false, mission, renderer, life, tutorial, audio, story, tutorialPanel, astraPanel, storage = null, reducedMotion = false, astraLessonAnswered = false;
 let lastTime = 0, uiElapsed = 0, noticeTimer, bannerTimer, shownTutorialStep = '', previousOccupied = false, highlightedTutorialTarget = null, circuitHintStep = '';
-let toastMessage = '';
+let toastMessage = '', lastAstraMonitor = 0;
+const proactiveAstra = createAstraMonitor();
 let assistedPlan = null, assistedFollowing = false, selectingRoutePoint = false, labelsEnabled = true, displayedLesson = '';
 let workbenchOpen=false, panDragMode=false, preferredPerspective='third-person';
 const workbenchRanges=new Map();
@@ -58,6 +60,8 @@ function syncSettings() {
   const enabled = readPreference('luna-academy-guide-v1', {disabled:false}, storage)?.disabled !== true;
   for(const id of ['tutorial-toggle','tutorial-setting-toggle']) { $(id).textContent = enabled ? 'Tutorial on' : 'Tutorial off'; $(id).setAttribute('aria-pressed',String(enabled)); }
   $('tutorial-setting').textContent = enabled ? 'ASTRA explains each action as you perform it. Each new level has its own guide.' : 'Tutorial hidden. Turn it on or show it below; your mission progress is kept.';
+  const guidance=readPreference('luna-astra-guidance-v1',mission?.isExpedition?(mission.state.expedition.stage<2?'coach':'advisor'):'coach',storage);
+  if($('astra-guidance'))$('astra-guidance').value=guidance;
   $('labels-button').textContent = labelsEnabled ? 'High contrast world labels on' : 'World labels off';
   $('labels-button').setAttribute('aria-pressed',String(labelsEnabled));
 }
@@ -169,13 +173,37 @@ function plotObjective() {
   processEvents();
 }
 function askAstra(question) {
-  if(flight?.active){const t=flight.telemetry();$('astra-message').textContent='Odyssey · '+t.location+'. '+(flight.phase==='cockpit'?'Cabin secure. Press the visible amber LAUNCH switch.':flight.phase==='transfer'&&!flight.flightEvent.resolved?'At mid-cruise, choose which electrical circuit to isolate or activate backup power.':'Follow the current flight instruction.')+' Velocity '+t.velocityMps.toFixed(1)+' m/s; cabin '+t.cabinPressureKpa.toFixed(1)+' kPa; external pressure '+t.exteriorPressureKpa.toFixed(3)+' kPa; remaining '+Math.round(t.remainingKm).toLocaleString()+' km. Gravity '+t.gravityMps2.toPrecision(3)+' m/s². This is the actual flight model state.';return;}
-  const request = resolveRouteRequest(mission, question);
-  if(request) showAssistedRoute(request);
-  else $('astra-message').textContent = mission.astra(question);
+  if(flight?.active){$('astra-message').textContent='Odyssey · '+flight.telemetry().location+'. '+(flight.phase==='cockpit'?'Cabin secure. Press the visible amber LAUNCH switch.':flight.phase==='transfer'&&!flight.flightEvent.resolved?'At mid-cruise, choose which electrical circuit to isolate or activate backup power.':'Follow the current flight instruction.')+' Numeric telemetry is shown on the flight instruments.';return;}
+  const route = runAstraTool('estimateRoute', mission, { target: question });
+  if(route) showAssistedRouteResult(route);
+  else $('astra-message').textContent = astraReplyLocal(question);
   beep(530, 0.1);
   if (tutorial?.active && tutorial.step.id === 'astra' && !$('astra-card').hidden) { astraLessonAnswered = true; syncTutorial(); }
   astraPanel?.refresh();
+}
+function astraReplyLocal(question) {
+  const view = createAstraMissionView(mission);
+  const level=readPreference('luna-astra-guidance-v1',mission.isExpedition?(mission.state.expedition.stage<2?'coach':'advisor'):'coach',storage);
+  const result=astraReply(question,{mission:view}),answer=result?.text||view.astra(question);
+  const grounded=answer;
+  if(level==='coach'&&result?.topic==='mission')return 'What do you think is the main constraint right now? '+grounded;
+  return grounded;
+}
+function showAssistedRouteResult(result) {
+  clearAssistedRoute();
+  $('astra-message').textContent = result?.error || (result?.message ? result.message+' Source: forecast from current state.' : 'No route estimate is available.');
+  if(!result || result.error)return;
+  assistedPlan=result;renderer.assistedRoute=result;setView('surface');renderer.frameRoute?.(result.path);
+  $('follow-button').setAttribute('aria-pressed','false');syncAssistedRoute();astraPanel?.refresh();
+}
+function monitorAstra(now) {
+  if(now-lastAstraMonitor<5000)return;lastAstraMonitor=now;
+  const guidance=readPreference('luna-astra-guidance-v1',null,storage)||((mission?.lesson?.id||'').includes('academy')||mission?.levelIndex===0?'coach':'advisor');
+  const tutorialOn=readPreference('luna-academy-guide-v1',{disabled:false},storage)?.disabled!==true;
+  for(const item of proactiveAstra.check(mission,now,{guidance:guidance||'advisor',tutorials:tutorialOn})) {
+    if(item.severity==='warning')notice('ASTRA warning: '+item.text,'warning');
+    else if($('astra-card').hidden===false)$('astra-message').textContent='ASTRA advisory: '+item.text;
+  }
 }
 function setAstraOpen(open, focus = true, refreshAdvice = true) {
   const card = $('astra-card');
@@ -194,19 +222,14 @@ function clearAssistedRoute() {
   $('astra-route-card').hidden=true;
 }
 function showAssistedRoute(request) {
-  clearAssistedRoute(); const result=planSurfaceRoute(mission,request);
-  $('astra-message').textContent=result.error || result.message;
-  if(result.error)return;
-  assistedPlan=result;renderer.assistedRoute=result;setView('surface');renderer.frameRoute?.(result.path);
-  $('follow-button').setAttribute('aria-pressed','false');
-  syncAssistedRoute();astraPanel?.refresh();
+  showAssistedRouteResult(runAstraTool('estimateRoute',mission,{target:request}));
 }
 function syncAssistedRoute() {
   if(!assistedPlan)return;
   const s=mission.state;
   if(['complete','failed'].includes(s.status)){clearAssistedRoute();return;}
   if(Math.hypot(s.player.x-assistedPlan.from.x,s.player.y-assistedPlan.from.y)>1||s.rover.occupied!==assistedPlan.rover){
-    const refreshed=planSurfaceRoute(mission,assistedPlan.request);
+    const refreshed=runAstraTool('estimateRoute',mission,{target:assistedPlan.request});
     if(refreshed.error){clearAssistedRoute();$('astra-message').textContent=refreshed.error;return;}
     assistedPlan=refreshed;
   }
@@ -224,7 +247,7 @@ function syncAssistedRoute() {
 }
 function followAssistedRoute() {
   if(!assistedPlan||mission.state.status!=='playing')return;
-  const refreshed=planSurfaceRoute(mission,assistedPlan.request);
+  const refreshed=runAstraTool('estimateRoute',mission,{target:assistedPlan.request});
   if(refreshed.error){clearAssistedRoute();$('astra-message').textContent=refreshed.error;return;}
   assistedPlan=refreshed;
   if(mission.navigate(assistedPlan.target)){
@@ -713,6 +736,7 @@ function setupEvents() {
   $('tutorial-toggle').addEventListener('click',toggleTutorial);
   $('tutorial-setting-toggle').addEventListener('click',toggleTutorial);
   $('settings-button').addEventListener('click',()=>openDialog($('settings-dialog')));
+  $('astra-guidance').addEventListener('change',()=>{writePreference('luna-astra-guidance-v1',$('astra-guidance').value,storage);});
   $('labels-button').addEventListener('click',()=>{labelsEnabled=!labelsEnabled;writePreference('luna-labels-v1',labelsEnabled,storage);syncSettings();updateWayfinding();});
   $('reset-camera').addEventListener('click',()=>{resetCamera();$('settings-dialog').close();setView('surface');notice('Camera reset. Follow the gold objective marker or use Go to objective.');});
   $('reset-panels').addEventListener('click',()=>{tutorialPanel.reset();astraPanel.reset();notice('Tutorial and ASTRA positions reset.');});
@@ -848,7 +872,7 @@ function animate(now) {
   if(astro?.mode==='mission')astro.setMissionUTC(mission.utcStart+mission.state.time);
   processEvents(); uiElapsed += dt;
   if (uiElapsed >= 0.25) { updateUI(); uiElapsed = 0; }
-  audio.update(mission.state, life, tutorial.holdsTime); if(!$('story-dialog').open){if(renderer.mode==='solar')flightRenderer.drawSolarSystem();else renderer.draw(now / 1000, life);updateWayfinding();} requestAnimationFrame(animate);
+  audio.update(mission.state, life, tutorial.holdsTime); monitorAstra(now); if(!$('story-dialog').open){if(renderer.mode==='solar')flightRenderer.drawSolarSystem();else renderer.draw(now / 1000, life);updateWayfinding();} requestAnimationFrame(animate);
 }
 function resourceRows(o){return [[o.oxygen.toFixed(1)+' crew·h','O₂ inventory'],[o.water.toFixed(1)+' L','Crew water'],[o.food.toFixed(1)+' portions','Crew food'],[o.energy.toFixed(1)+' kWh','Battery'],[o.habitat.toFixed(0)+'%','Habitat'],[o.health.toFixed(0)+'%','Crew health'],[o.fatigue.toFixed(0)+'%','Fatigue'],[o.radiation.toFixed(2)+' mSv','Training dose'],[o.fuel.toFixed(1)+' units','Emergency fuel'],[String(o.kits),'Maintenance kits'],[String(o.science),'Science points'],[o.relay?'ONLINE':'OFFLINE','Field relay']];}
 function fillResourceGrid(node,o){node.replaceChildren(...resourceRows(o).map(([value,label])=>{const cell=document.createElement('div'),title=document.createElement('small'),number=document.createElement('strong');title.textContent=label;number.textContent=value;cell.append(title,number);return cell;}));}
@@ -863,7 +887,7 @@ function showDecision(){
 }
 function renderDecision(){
  if(!mission.isExpedition)return;const stage=mission.stage,e=mission.state.expedition,task=mission.taskView();$('decision-kicker').textContent='MISSION '+mission.config.worldName.toUpperCase()+' / '+(e.stage+1)+' OF 7';$('decision-title').textContent=stage.title;$('decision-description').textContent=stage.description;
- $('decision-task-instruction').textContent=task.instruction;$('decision-task-action').textContent=task.label+' →';$('decision-task-action').disabled=task.done||stage.task==='circuit';fillResourceGrid($('decision-resources'),e.outpost);$('decision-astra').textContent='ASTRA: '+mission.astra(stage.id==='shelter'?'What is our biggest risk?':'Why did power decrease?');
+ $('decision-task-instruction').textContent=task.instruction;$('decision-task-action').textContent=task.label+' →';$('decision-task-action').disabled=task.done||stage.task==='circuit';fillResourceGrid($('decision-resources'),e.outpost);$('decision-astra').textContent='ASTRA: '+astraReplyLocal(stage.id==='shelter'?'What is our biggest risk?':'Why did power decrease?');
  $('decision-options').replaceChildren(...stage.options.map(option=>{const box=document.createElement('section'),name=document.createElement('h3'),text=document.createElement('p'),preview=document.createElement('pre'),button=document.createElement('button'),p=mission.preview(option),o=p.outpost;box.className='decision-option';name.textContent=option.label;text.textContent=option.explanation;preview.textContent=option.minutes+' mission min\nAfter action: '+o.energy.toFixed(1)+' kWh · '+o.oxygen.toFixed(1)+' crew·h O₂\n'+o.water.toFixed(1)+' L water · '+o.health.toFixed(0)+'% health\nScience '+o.science+' · kits '+o.kits+' · fuel '+o.fuel.toFixed(1)+(p.failure?'\nRisk: '+p.failure:'');button.className='primary-button';button.textContent='Choose this plan →';button.disabled=!e.taskDone||Object.entries(option.effects).some(([k,v])=>['kits','fuel','water','oxygen','energy'].includes(k)&&typeof v==='number'&&e.outpost[k]+v<0);button.addEventListener('click',()=>{if(mission.choose(option.id)){$('decision-dialog').close();processEvents();updateUI();}});box.append(name,text,preview,button);return box;}));
 }
 function showExpeditionDebrief(){

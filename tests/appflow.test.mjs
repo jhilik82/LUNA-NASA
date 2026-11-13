@@ -14,6 +14,8 @@ import { StorySequence } from '../dist/story.js';
 import { FlightSimulation, WORLDS, localSky } from '../dist/voyage.js';
 import { AstronomicalWorld } from '../dist/astronomy-world.js';
 import { powerBalance } from '../dist/expedition.js';
+import { runAstraTool, createAstraMissionView, createAstraMonitor } from '../dist/astra-tools.js';
+import { astraReply } from '../dist/astra-chat.js';
 import { createDestinationMission } from '../dist/worlds.js';
 import { loadGameData, connectLocalBackend } from '../dist/local-backend.js';
 import { PuzzleTimer, puzzleTimeLimit } from '../dist/puzzle-timer.js';
@@ -93,7 +95,7 @@ async function interfaceContext(storage,{skipStory=true,skipFlight=true,scientif
   for(const e of nodes.values())e.ownerDocument=document;
   const windowEvents = new Element();
   const shared=scientific?{...data,tranquillitatis:JSON.parse(fs.readFileSync(new URL('../dist/data/terrain-tranquillitatis.json',import.meta.url))),astronomy:JSON.parse(fs.readFileSync(new URL('../dist/data/astronomy.json',import.meta.url))),stars:JSON.parse(fs.readFileSync(new URL('../dist/data/stars.json',import.meta.url))),scenarios:JSON.parse(fs.readFileSync(new URL('../dist/data/scenarios.json',import.meta.url)))}:data;
-  const ctx = { document, loadGameData, connectLocalBackend, AstronomicalWorld,powerBalance,PuzzleTimer,puzzleTimeLimit,buildRecapQuiz,scoreRecap,chooseWeather,stageWeather,FlightSimulation,WORLDS,localSky,createDestinationMission,FlightRenderer:class{constructor(r,f,d){this.r=r;this.sim=f;this.data=d;this.rotations=[];this.hits=0;}draw(){}dispose(){}rotate(yaw,pitch){this.rotations.push({yaw,pitch});}hitButton(){this.hits++;return true;}drawSolarSystem(){}rotateSolar(){}}, Mission, TrainingMission, clamp, AcademyGuide, Soundtrack, MissionAudio, StorySequence, MovablePanel, resolveRouteRequest, planSurfaceRoute, readPreference, writePreference, Renderer: RenderDouble,
+  const ctx = { document, loadGameData, connectLocalBackend, AstronomicalWorld,powerBalance,PuzzleTimer,puzzleTimeLimit,buildRecapQuiz,scoreRecap,chooseWeather,stageWeather,FlightSimulation,WORLDS,localSky,createDestinationMission,FlightRenderer:class{constructor(r,f,d){this.r=r;this.sim=f;this.data=d;this.rotations=[];this.hits=0;}draw(){}dispose(){}rotate(yaw,pitch){this.rotations.push({yaw,pitch});}hitButton(){this.hits++;return true;}drawSolarSystem(){}rotateSolar(){}}, Mission, TrainingMission, clamp, AcademyGuide, Soundtrack, MissionAudio, StorySequence, MovablePanel, resolveRouteRequest, planSurfaceRoute, readPreference, writePreference, Renderer: RenderDouble,runAstraTool,createAstraMissionView,createAstraMonitor,astraReply,
     LUNA_DATA: shared, localStorage: storage, devicePixelRatio: 1, innerWidth:1440, innerHeight:900, matchMedia: () => ({ matches: false }), addEventListener:(...args)=>windowEvents.addEventListener(...args), fire:(...args)=>windowEvents.fire(...args),
     ResizeObserver: class { observe() {} }, console, setTimeout: () => 1, clearTimeout() {}, requestAnimationFrame(fn) { ctx.frame = fn; }
   };
@@ -112,7 +114,7 @@ test('academy controller restores guidance, keeps Settings reversible, and unloc
   nodes.get('settings-button').fire('click'); assert.equal(nodes.get('settings-dialog').open,true); assert.equal(m.state.status,'paused');
   for(let i=0;i<60;i++)ctx.frame(++frame*1000/60);
   assert.deepEqual([m.state.time,m.state.distanceMetres,m.state.oxygen],progress);
-  nodes.get('music-toggle').fire('click'); assert.equal(ctx.luna.audio.settings.musicOn,false);assert.equal(ctx.luna.audio.settings.effectsOn,true);
+  nodes.get('music-toggle').fire('click'); assert.equal(ctx.luna.audio.muted,true);
   nodes.get('tutorial-setting-toggle').fire('click'); assert.equal(guide.active,false);
   nodes.get('tutorial-restart').fire('click'); assert.equal(nodes.get('settings-dialog').open,false);assert.equal(guide.active,true);assert.equal(m.state.status,'playing');
   assert.deepEqual([m.state.time,m.state.distanceMetres,m.state.oxygen],progress);
@@ -249,9 +251,9 @@ test('ASTRA opens on demand, answers questions, retains its moved position, and 
   const start={...m.state.player}; document.fire('keydown',{target:nodes.get('astra-input'),key:'w'});
   for(let i=1;i<=20;i++)ctx.frame(i*1000/60);
   assert.equal(m.state.player.x,start.x); assert.equal(m.state.player.y,start.y);
-  prompts[1].fire('click'); assert.equal(nodes.get('astra-message').textContent,m.astra(prompts[1].dataset.question));
+  prompts[1].fire('click'); assert.match(nodes.get('astra-message').textContent,/What do you think is the main constraint right now\?/);assert.match(nodes.get('astra-message').textContent,/Source: forecast from current state\./);
   nodes.get('astra-input').value='How do I move?'; nodes.get('astra-form').fire('submit');
-  assert.equal(nodes.get('astra-message').textContent,m.astra('How do I move?')); assert.equal(nodes.get('astra-input').value,'');
+  assert.match(nodes.get('astra-message').textContent,/WASD or the arrow keys move you/); assert.equal(nodes.get('astra-input').value,'');
   const handle=nodes.get('astra-drag-handle');handle.fire('pointerdown',{button:0,pointerId:5,clientX:1080,clientY:380});ctx.fire('pointermove',{pointerId:5,clientX:150,clientY:160});ctx.fire('pointerup',{pointerId:5});
   const position=[nodes.get('astra-card').style.left,nodes.get('astra-card').style.top];
   nodes.get('astra-card').fire('keydown',{key:'Escape'}); assert.equal(nodes.get('astra-card').hidden,true); assert.equal(document.activeElement,nodes.get('astra-button'));
@@ -323,7 +325,7 @@ test('scientific controller connects outpost decisions, clock exploration, catal
  assert.equal(m.isExpedition,true);assert.equal(nodes.get('solar-explorer').parentElement,playfield);assert.equal(nodes.get('solar-body').children.length,26);assert.equal(nodes.get('outpost-resources').children.length,12);
  const beforePanel=JSON.stringify(m.state);nodes.get('panel-systems').fire('click');assert.equal(nodes.get('mission-panel').classes.has('show-systems'),true);assert.equal(nodes.get('panel-systems').getAttribute('aria-pressed'),'true');nodes.get('panel-mission').fire('click');assert.equal(nodes.get('mission-panel').classes.has('show-systems'),false);assert.equal(JSON.stringify(m.state),beforePanel,'compact panel navigation keeps mission progress');
  nodes.get('next-action-button').fire('click');assert.equal(m.state.status,'playing');travel(m,m.target());m.interact();ctx.processEvents();assert.equal(nodes.get('repair-dialog').open,true);solve(m);nodes.get('apply-repair').fire('click');assert.equal(nodes.get('decision-dialog').open,true);assert.equal(nodes.get('decision-options').children.length,3);
- nodes.get('decision-options').children[0].children.at(-1).fire('click');assert.equal(m.state.expedition.stage,0,'preview is not a commit');nodes.get('decision-confirm').fire('click');nodes.get('consequence-next').fire('click');assert.equal(m.state.expedition.stage,1);assert.equal(nodes.get('decision-dialog').open,false);assert.equal(m.state.status,'playing');
+ const decisionsBefore=m.state.expedition.decisions.length;nodes.get('decision-options').children[0].children.at(-1).fire('click');assert.equal(m.state.expedition.stage,1,'player choice commits the preview once');assert.equal(m.state.expedition.decisions.length,decisionsBefore+1);assert.equal(nodes.get('decision-dialog').open,false);assert.equal(m.state.status,'playing');
  const state=JSON.stringify(m.state),utc=a.utc;nodes.get('sky-button').fire('click');assert.equal(a.mode,'exploration');nodes.get('astronomy-utc').value='2027-01-01T12:00';nodes.get('astronomy-utc').fire('change');assert.equal(new Date(a.utc*1000).toISOString(),'2027-01-01T12:00:00.000Z');assert.equal(JSON.stringify(m.state),state);assert.equal(nodes.get('sky-body-list').children.length,25);nodes.get('sky-close').fire('click');assert.equal(a.utc,utc);assert.equal(a.mode,'mission');
  nodes.get('save-checkpoint').fire('click');assert.ok(values.has('luna-expedition-v2-moon'));nodes.get('journey-button').fire('click');assert.equal(ctx.luna.flight.phase,'briefing');assert.equal(nodes.get('continue-surface').hidden,false);nodes.get('continue-surface').fire('click');assert.equal(ctx.luna.mission.state.expedition.stage,1);assert.equal(ctx.luna.mission.state.status,'playing');
 });

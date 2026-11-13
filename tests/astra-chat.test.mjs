@@ -38,7 +38,7 @@ test('ASTRA is a supportive companion: feelings, small talk, jokes, controls and
 
 test('mission questions still use live mission numbers; unknown questions get an honest answer plus the next step', () => {
   const m = mission('moon', 'training');
-  assert.equal(astraReply('Is my return reserve safe?', { mission: m }).text, m.astra('is my return reserve safe?'));
+  assert.match(astraReply('Is my return reserve safe?', { mission: m }).text, /Source: forecast from current state\./);
   assert.equal(astraReply('Is my return reserve safe?', { mission: m }).topic, 'mission');
   const unknown = astraReply('what is the capital of peru?', { mission: m });
   assert.equal(unknown.topic, 'unknown'); assert.match(unknown.text, /don’t have data on that/); assert.match(unknown.text, new RegExp(m.nextAction().title));

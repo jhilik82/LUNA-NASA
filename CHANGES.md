@@ -155,3 +155,10 @@ This includes retained documentation whose old branding was removed. Runtime `ba
 | Added | `tools/narration-script.json` |
 | Added | `tools/record_narration.py` |
 | Added | `CHANGES.md` |
+# ASTRA read-only agent
+
+- Added a frozen ASTRA tool registry for mission reads, decision and route previews, assumption explanations, and non-progress UI actions. ASTRA receives cloned mission snapshots and has no registered confirmation, procedure, resource, or save capability.
+- Added throttled proactive advisories, authored threshold configuration, persisted Coach / Advisor / Quiet guidance, and provenance tags for numeric chat answers.
+- Added Moon and Mars registry non-mutation, preview/confirm-once, procedure boundary, and monitor tests. Updated the project guide and player help.
+- Visual testing: not performed for this change. Existing QA limits for software WebGL rendering still apply; real hardware and mobile appearance remain unverified.
+

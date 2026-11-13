@@ -12,14 +12,14 @@ const GREETING = /^(hi+|hello+|hey+|hiya|yo|howdy|greetings|good (morning|aftern
 
 // Quick space facts, chosen by keywords. Each entry: [pattern, Moon answer, Mars answer].
 const FACTS = [
-  [/gravity|weigh|jump|how high/, 'Moon gravity is 1.62 m/s², about one-sixth of Earth’s. A 60 kg astronaut weighs what a 10 kg backpack weighs on Earth, which is why we bound instead of walk.', 'Mars gravity is 3.73 m/s², about three-eighths of Earth’s. You weigh a little over a third of your Earth weight here.'],
-  [/temperature|cold|hot|freez/, 'The Moon swings from about +120 °C in sunlight to about −130 °C at night, and colder still in shadowed craters. Your suit keeps you near room temperature.', 'Mars averages about −60 °C. A summer afternoon near the equator can reach about +20 °C, but nights drop below −70 °C.'],
-  [/day|night|how long.*(day|sun)/, 'One lunar day, sunrise to sunrise, lasts about 29.5 Earth days, so we get roughly two weeks of sunlight and then two weeks of night.', 'A Mars day (a “sol”) is 24 hours 39 minutes, very close to Earth’s.'],
+  [/gravity|weigh|jump|how high/, 'Moon gravity is much lower than Earth’s, which is why astronauts bound instead of walk.', 'Mars gravity is lower than Earth’s, so you feel lighter here.'],
+  [/temperature|cold|hot|freez/, 'The Moon has extreme swings between sunlight and darkness, and shadowed craters can be colder still. Your suit keeps you near room temperature.', 'Mars is cold on average. Daytime warmth near the equator can give way to very cold nights.'],
+  [/day|night|how long.*(day|sun)/, 'A lunar day, sunrise to sunrise, lasts many Earth days, giving long periods of sunlight and darkness.', 'A Mars day (a “sol”) is close to an Earth day.'],
   [/sky.*(black|dark)|why.*black|blue sky|sky colou?r/, 'There is no air on the Moon to scatter sunlight, so the sky stays black even in full daylight.', 'Fine dust in the thin air makes the Martian sky butterscotch by day, and sunsets look blue.'],
-  [/how far|distance.*earth|far from (home|earth)/, 'Earth is about 384,000 km away, roughly 1.3 light-seconds. A message home takes just over a second.', 'Mars is between about 55 and 400 million km from Earth. A radio message takes 3 to 22 minutes each way.'],
+  [/how far|distance.*earth|far from (home|earth)/, 'Earth is nearby on the lunar scale, and messages travel quickly compared with a Mars mission.', 'Mars is millions of kilometres from Earth; radio delay varies with the planets’ positions.'],
   [/water|ice/, 'There is water ice in permanently shadowed craters near the lunar poles. One day it could make drinking water, oxygen and rocket fuel.', 'Mars has water ice at its poles and just under the ground in many places. Jezero Crater, where we are, was once a lake.'],
-  [/air|breathe|atmosphere/, 'The Moon has almost no atmosphere, practically a vacuum. Without your suit there is nothing to breathe and no sound.', 'Mars has a thin atmosphere, about 1% of Earth’s pressure and mostly carbon dioxide. You still need your suit and oxygen.'],
-  [/apollo|first.*(moon|step)|armstrong|landed/, 'Apollo 11 landed in Mare Tranquillitatis, right in this region, on 20 July 1969. Neil Armstrong and Buzz Aldrin walked here.', 'NASA’s Perseverance rover landed in Jezero Crater on 18 February 2021 to look for signs of ancient life.'],
+  [/air|breathe|atmosphere/, 'The Moon has almost no atmosphere, practically a vacuum. Without your suit there is nothing to breathe and no sound.', 'Mars has a thin atmosphere made mostly of carbon dioxide. You still need your suit and oxygen.'],
+  [/apollo|first.*(moon|step)|armstrong|landed/, 'Apollo missions landed in Mare Tranquillitatis, right in this region. Neil Armstrong and Buzz Aldrin walked there.', 'NASA’s Perseverance rover landed in Jezero Crater to look for signs of ancient life.'],
   [/dust|regolith/, 'Lunar dust (regolith) is sharp and clingy because no wind or water has ever smoothed it. It gets into everything, so we brush down before entering Haven.', 'Martian dust is fine and reddish (iron oxide). Storms can cover the whole planet and dim our solar panels.'],
   [/radiation|sun storm|solar storm|flare/, 'With no air or magnetic field, the Moon gets the full solar wind. During a solar storm we shelter in Haven and watch our dose.', 'Mars has no global magnetic field and thin air, so radiation is higher than on Earth. We track the dose and use shielding.'],
 ];
@@ -60,9 +60,13 @@ export function astraReply(question, { mission = null, flight = null, crewName =
   const greeted = GREETING.test(q);
   if (greeted) q = q.replace(GREETING, '').trim();
   const hello = greeted ? pick(['Hi! ', 'Hello, astronaut! ', 'Hey there! '], seed) : '';
-  const reply = (text, topic) => ({ text: hello + text, topic });
+  const reply = (text, topic) => {
+    const answer = hello + text;
+    const source = ['mission','next','story','feeling','encourage'].includes(topic) || (topic==='greeting'&&!!step) ? 'forecast from current state' : 'authored assumption';
+    return { text: /\d/.test(answer) ? answer + ' Source: ' + source + '.' : answer, topic };
+  };
 
-  if (!q) return { text: pick(['Hello, astronaut! ASTRA here, your mission companion.', 'Hi! Good to hear your voice on the comm.', 'Hey there! All systems are listening.'], seed) + (step ? ' Right now: ' + step : ' Ask me anything, I’m here to help.'), topic: 'greeting' };
+  if (!q) return reply(pick(['Hello, astronaut! ASTRA here, your mission companion.', 'Hi! Good to hear your voice on the comm.', 'Hey there! All systems are listening.'], seed) + (step ? ' Right now: ' + step : ' Ask me anything, I’m here to help.'), 'greeting');
 
   // Feelings first: support comes before data.
   if (/\b(scared|afraid|frighten|nervous|anxious|worried|panic|fear)\b/.test(q)) {
@@ -77,7 +81,7 @@ export function astraReply(question, { mission = null, flight = null, crewName =
   // Small talk.
   if (/how are (you|u)|how('s| is) it going|how do you feel|are you (ok|okay|alright)/.test(q)) return reply('All my systems are green, thanks for asking! I’m tracking your suit, the route and ' + base(mission) + '. How are you feeling?', 'smalltalk');
   if (/who are (you|u)|what are (you|u)|your name|are you (a|an) (robot|ai|human|bot)/.test(q)) return reply('I’m ASTRA, your mission companion on ' + where + '. I watch your oxygen, power and route, explain what’s happening and help you decide what to do next.', 'identity');
-  if (/what can (you|u) do|what can i ask|how do (you|i) (use|talk)|commands/.test(q)) return reply('Ask me things like “what should I do next?”, “can I get back safely?”, “route to Echo”, “north 200 m”, “why is my power dropping?”, “what’s the gravity here?”, or just tell me how you feel. I answer with your live mission numbers.', 'help');
+  if (/what can (you|u) do|what can i ask|how do (you|i) (use|talk)|commands/.test(q)) return reply('Ask me things like “what should I do next?”, “can I get back safely?”, “route to Echo”, “head north by a chosen distance”, “why is my power dropping?”, “what’s the gravity here?”, or just tell me how you feel. I answer with your current mission readings.', 'help');
   if (/\b(thanks|thank you|thx|ty|appreciate)\b/.test(q)) return reply(pick(['Anytime, astronaut. That’s what I’m here for.', 'You’re welcome! Proud to fly with you.', 'Happy to help. I’ve got your back.'], seed), 'thanks');
   if (/^(bye|goodbye|see (you|ya)|good night|gn)\b/.test(q)) return reply('See you soon! I’ll keep watch over ' + base(mission) + ' while you’re away.', 'bye');
   if (/\b(joke|funny|laugh|make me smile)\b/.test(q)) return reply(pick(JOKES, seed), 'joke');
@@ -92,7 +96,7 @@ export function astraReply(question, { mission = null, flight = null, crewName =
     const story = scenario ? (scenario.brief || scenario.title) : lesson ? 'This is flight-school level ' + ((mission.levelIndex ?? 0) + 1) + ': ' + lesson.title + '. ' + (lesson.brief || '') : mission?.config?.world === 'mars' ? 'Our crew lives at Haven in Jezero Crater on Mars. Everything we need has to be carried, grown or carefully saved.' : 'Our crew lives at Haven in Mare Tranquillitatis on the Moon. Our rover Echo and the systems that keep us alive need care every day.';
     return reply((/to (you|u)\b/.test(q) ? 'Nothing bad happened to me. I’m fine and fully online! ' : '') + 'Our mission: ' + story + (step ? ' What we need now: ' + step : ''), 'story');
   }
-  if (/\b(crew|team|botanist|engineer|commander|friends|who else)\b/.test(q)) return reply('There are four of us at ' + base(mission) + ': you, the engineer who keeps the power and life support running, the botanist who grows our food in the greenhouse, and another crewmate on duty rotation. You’ll see them moving between stations, each in their own suit colour.', 'crew');
+  if (/\b(crew|team|botanist|engineer|commander|friends|who else)\b/.test(q)) return reply('Your crew at ' + base(mission) + ' includes the engineer who keeps the power and life support running, the botanist who grows food in the greenhouse, and a crewmate on duty rotation. You’ll see them moving between stations, each in their own suit colour.', 'crew');
 
   // What now?
   if (/what (should|do|can) i do|what now|what('s| is) next|next (step|move|task)|where (should|do) i go|what('s| is) my (task|goal|mission|objective)|objective|how do i (start|continue|win|finish)/.test(q)) {
