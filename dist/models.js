@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 export function makeMaterials() {
   const material = (color, roughness = .7, metalness = .1, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness, metalness, depthTest: true, depthWrite: true, ...extra });
   return {
-    suit: material('#f4f3ee', .82, 0), dark: material('#202731', .66), silver: material('#bac2ca', .28, .78),
+    suit: material('#e6e5df', .88, 0), dark: material('#202731', .66), silver: material('#bac2ca', .28, .78),
     white: material('#dce0df', .48, .16), orange: material('#d66b36', .5, .22),
     gold: material('#c89438', .17, .90), blue: material('#142e50', .32, .47),
     foil: material('#b49b61', .56, .72),
@@ -38,24 +38,15 @@ function beam(p,m,a,b,r=.065) {
   rod.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());return rod;
 }
 
-// Suit accents: each crew member wears a white suit with bold panels in their own colour,
-// so they are easy to tell apart and the suit reads clearly on grey regolith and red dust.
-export const SUIT_ACCENTS={player:'#ff6a2b',botanist:'#22c47e',engineer:'#ffc21a',scientist:'#2f9bff',mentor:'#a66bff'};
-function suitAccent(mat,color){
-  mat.suitAccents ||= new Map();
-  if(!mat.suitAccents.has(color))mat.suitAccents.set(color,new THREE.MeshStandardMaterial({color,roughness:.46,metalness:.08,emissive:color,emissiveIntensity:.06}));
-  return mat.suitAccents.get(color);
-}
-export function createAstronaut(mat,{accent=SUIT_ACCENTS.player}={}) {
-  const trim=suitAccent(mat,accent);
+export function createAstronaut(mat) {
   const group=new THREE.Group();group.name='astronaut';
   const body=new THREE.Group();group.add(body);body.name='suit-body';
   mesh(body,new THREE.CapsuleGeometry(.69,.95,10,32),mat.suit,[0,2.65,0],[1,1,.74]);
   box(body,mat.dark,0,2.95,.51,1.05,.59,.15,'chest-console');
-  box(body,trim,0,3.05,.60,.5,.11,.07);
+  box(body,mat.orange,0,3.05,.60,.5,.11,.07);
   for(let i=0;i<3;i++)sphere(body,mat.cyan,-.32+i*.32,2.79,.61,.044);
   box(body,mat.white,0,2.7,-.69,1.28,1.73,.67,'life-support-pack');
-  box(body,trim,0,3.35,-1.03,1.08,.14,.05);
+  box(body,mat.orange,0,3.35,-1.03,1.08,.14,.05);
   for(let i=0;i<4;i++)box(body,mat.dark,0,2.30+i*.17,-1.04,.90,.07,.05);
   cylinder(body,mat.dark,0,3.63,0,.51,.23,'helmet-collar');
   const helmet=new THREE.Group();helmet.position.y=4.28;helmet.scale.setScalar(.82);helmet.name='helmet-pivot';body.add(helmet);
@@ -63,27 +54,24 @@ export function createAstronaut(mat,{accent=SUIT_ACCENTS.player}={}) {
   const visor=sphere(helmet,mat.gold,0,-.03,.56,.74,[.97,.70,.49],'gold-visor');
   const rim=mesh(helmet,new THREE.TorusGeometry(.74,.026,8,56),mat.dark,[0,-.03,.57],[.98,.71,1],'visor-seal');
   // The visor is an opaque depth-writing curved mesh, never a screen overlay.
-  box(helmet,trim,0,.42,.47,1.10,.10,.21);
-  for(const side of [-1,1])box(helmet,trim,side*.66,.32,-.05,.08,.42,.7,'helmet-side-stripe');
+  box(helmet,mat.white,0,.42,.47,1.10,.10,.21);
   for(const sign of [-1,1]) {
     sphere(helmet,mat.silver,sign*.87,-.03,0,.18,[.7,1,1]);
     const arm=new THREE.Group();arm.position.set(sign*.85,3.18,0);body.add(arm);arm.name=sign<0?'left-arm':'right-arm';
-    sphere(arm,trim,0,.02,0,.3,[1,.72,1],'shoulder-cap');cylinder(arm,trim,0,-.3,0,.24,.13,'upper-arm-band');
     cylinder(arm,mat.suit,0,-.46,0,.23,.90);sphere(arm,mat.dark,0,-.92,0,.22);
     const elbow=new THREE.Group();elbow.position.y=-.92;elbow.name=sign<0?'left-elbow':'right-elbow';arm.add(elbow);
     const forearm=cylinder(elbow,mat.suit,0,-.38,.08,.20,.63);forearm.rotation.x=-.13;
-    cylinder(elbow,trim,0,-.61,.10,.215,.11);sphere(elbow,mat.suit,0,-.82,.11,.235,[1,1.25,1]);
+    cylinder(elbow,mat.orange,0,-.61,.10,.215,.11);sphere(elbow,mat.suit,0,-.82,.11,.235,[1,1.25,1]);
     for(let i=0;i<4;i++)box(elbow,mat.suit,-.12+i*.08,-1.01,.21,.075,.20,.14,'glove-finger');
     for(let i=0;i<5;i++){const fold=mesh(elbow,new THREE.TorusGeometry(.205,.018,6,32),mat.dark,[0,-.035-i*.055,.02],null,'elbow-flex-ring');fold.rotation.x=Math.PI/2;}
     if(sign<0){box(elbow,mat.dark,0,-.49,.27,.32,.34,.08,'wrist-computer');box(elbow,mat.cyan,0,-.49,.315,.23,.22,.018,'wrist-display');}
     const leg=new THREE.Group();leg.position.set(sign*.37,1.96,0);group.add(leg);leg.name=sign<0?'left-leg':'right-leg';
-    cylinder(leg,mat.suit,0,-.44,0,.29,.81);cylinder(leg,trim,0,-.34,0,.302,.2,'thigh-band');box(leg,trim,sign*.17,-.5,.2,.1,.46,.1,'thigh-stripe');sphere(leg,mat.dark,0,-.9,0,.24);
+    cylinder(leg,mat.suit,0,-.44,0,.29,.81);sphere(leg,mat.dark,0,-.9,0,.24);
     const knee=new THREE.Group();knee.position.y=-.9;knee.name=sign<0?'left-knee':'right-knee';leg.add(knee);
     cylinder(knee,mat.suit,0,-.4,0,.25,.61);box(knee,mat.dark,0,-.91,.16,.58,.30,.93,'boot');
     for(let i=0;i<4;i++){const fold=mesh(knee,new THREE.TorusGeometry(.245,.018,6,32),mat.dark,[0,-.02-i*.06,0],null,'knee-flex-ring');fold.rotation.x=Math.PI/2;}
-    box(knee,trim,0,-.70,.20,.56,.12,.49);
+    box(knee,mat.orange,0,-.70,.20,.56,.12,.49);
     for(let i=0;i<4;i++)box(knee,mat.silver,0,-1.063,-.16+i*.20,.52,.014,.055,'boot-tread');
-    sphere(knee,trim,0,-.06,.17,.19,[1,1,.55],'knee-cap');box(knee,trim,0,-.98,.55,.5,.16,.16,'toe-cap');
   }
   beam(body,mat.gold,[-.62,2.42,.47],[-.95,2.0,-.15],.045);
   const hose=new THREE.CatmullRomCurve3([new THREE.Vector3(.43,2.45,.58),new THREE.Vector3(.74,2.05,.45),new THREE.Vector3(.84,2.12,-.3),new THREE.Vector3(.55,2.5,-.7)]);mesh(body,new THREE.TubeGeometry(hose,28,.043,10,false),mat.dark,[0,0,0],null,'life-support-hose');

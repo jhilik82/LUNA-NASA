@@ -11,12 +11,8 @@ export function boundPanelPosition(position, size, viewport, gap = 12) {
 const validPosition = value => value && Number.isFinite(value.x) && Number.isFinite(value.y);
 
 export class MovablePanel {
-  // maxHeight caps the panel; topInset() returns the height of fixed chrome (the game's top bar) the panel must stay below.
-  // bounds() may return an on-screen rectangle (for example the 3D view) the panel must stay inside, or null for the whole
-  // window; boundsElement is watched so the panel moves back inside when that area changes size (sidebar shown/hidden).
-  constructor({ panel, handle, resetButton, storage = null, storageKey, view = globalThis.window, onGrab = () => {}, maxHeight = Infinity, topInset = null, bounds = null, boundsElement = null }) {
-    this.panel = panel; this.handle = handle; this.storage = storage; this.storageKey = storageKey; this.view = view; this.onGrab = onGrab; this.bounds = bounds;
-    this.maxHeight = maxHeight; this.topInset = topInset || (() => { const bar = this.view.document?.getElementById?.('game-header'), r = bar?.getBoundingClientRect?.(); return r && r.height > 0 && Number.isFinite(r.bottom) ? Math.max(0, r.bottom) : 0; });
+  constructor({ panel, handle, resetButton, storage = null, storageKey, view = globalThis.window, onGrab = () => {} }) {
+    this.panel = panel; this.handle = handle; this.storage = storage; this.storageKey = storageKey; this.view = view; this.onGrab = onGrab;
     const saved = readPreference(storageKey, null, storage);
     this.position = validPosition(saved) ? { x: saved.x, y: saved.y } : null;
     this.userPosition = !!this.position; this.drag = null;
@@ -31,25 +27,16 @@ export class MovablePanel {
     view.addEventListener('resize', () => this.refresh());
     view.visualViewport?.addEventListener('resize', () => this.refresh());
     view.visualViewport?.addEventListener('scroll', () => this.refresh());
-    // Refresh on the next frame: moving the panel inside the observer callback would start a resize loop.
-    if (view.ResizeObserver) { let queued = false; const watch = new view.ResizeObserver(() => { if (queued) return; queued = true; (view.requestAnimationFrame || (f => setTimeout(f, 16)))(() => { queued = false; this.refresh(); }); }); watch.observe(panel); if (boundsElement) watch.observe(boundsElement); }
+    if (view.ResizeObserver) new view.ResizeObserver(() => this.refresh()).observe(panel);
   }
   viewport() {
     const v = this.view.visualViewport;
     return { width: v?.width || this.view.innerWidth, height: v?.height || this.view.innerHeight, left: v?.offsetLeft || 0, top: v?.offsetTop || 0 };
   }
   place(position) {
-    const viewport = this.viewport(), raw = Number(this.topInset()), inset = Number.isFinite(raw) ? Math.min(Math.max(0, raw - viewport.top), viewport.height / 2) : 0;
-    let usable = { ...viewport, top: viewport.top + inset, height: viewport.height - inset };
-    const area = this.bounds?.();
-    if (area && [area.left, area.top, area.right, area.bottom].every(Number.isFinite) && area.right - area.left >= 200 && area.bottom - area.top >= 150) {
-      const left = Math.max(usable.left, area.left), top = Math.max(usable.top, area.top);
-      const right = Math.min(usable.left + usable.width, area.right), bottom = Math.min(usable.top + usable.height, area.bottom);
-      if (right - left >= 200 && bottom - top >= 150) usable = { left, top, width: right - left, height: bottom - top };
-    }
-    this.panel.style.maxHeight = Math.max(96, Math.min(this.maxHeight, usable.height - 24)) + 'px';
+    this.panel.style.maxHeight = Math.max(96, this.viewport().height - 24) + 'px';
     const rect = this.panel.getBoundingClientRect();
-    this.position = boundPanelPosition(position, rect, usable);
+    this.position = boundPanelPosition(position, rect, this.viewport());
     Object.assign(this.panel.style, { left: this.position.x + 'px', top: this.position.y + 'px', right: 'auto', bottom: 'auto' });
   }
   refresh() {

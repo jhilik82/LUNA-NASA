@@ -2,25 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-<<<<<<< HEAD
-  <meta name="luna-build" content="1.3.3">
-=======
->>>>>>> origin/main
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#132127">
   <meta name="description" content="Launch from Earth, land on the Moon or Mars, and train as a junior astronaut in two ten-mission campaigns. Practise EVA, repair, power, sample handling, antenna pointing and rover deliveries with ASTRA guidance.">
   <title>LUNA + ASTRA — Mission Trainer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23132127'/%3E%3Cpath d='M42 12a22 22 0 1 0 10 36A23 23 0 0 1 42 12' fill='%23f3e8cc'/%3E%3Ccircle cx='46' cy='18' r='4' fill='%23ff915d'/%3E%3C/svg%3E">
-<<<<<<< HEAD
-  <link rel="stylesheet" href="styles.css?v=1.3.3-merged">
-</head>
-<body>
-  <div class="boot-cover" id="loading" role="status" aria-label="Loading LUNA"><span class="story-brand">LUNA<span>BEYOND THE LIFELINE</span></span></div>
-=======
   <link rel="stylesheet" href="styles.css?v=1.2.3-local">
 </head>
 <body>
->>>>>>> origin/main
   <header class="masthead" id="game-header">
     <a class="brand" href="#" aria-label="LUNA home" id="brand-home">
       <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="M28 5A16 16 0 1 0 35 30 18 18 0 0 1 28 5" fill="currentColor"/><circle cx="31" cy="10" r="3" fill="#ff915d"/></svg>
@@ -47,11 +36,7 @@
         <div class="flight-steps" aria-label="Flight stages"><span id="stage-earth">01 · EARTH</span><span id="stage-cockpit">02 · COCKPIT</span><span id="stage-transfer">03 · TRANSFER</span><span id="stage-landing">04 · LANDING</span></div>
         <section class="destination-picker" id="destination-picker" aria-label="Destination selection">
           <span class="eyebrow">WHERE WILL YOU TRAIN?</span><div class="destination-options"><button id="destination-moon" aria-pressed="true"><strong>Moon</strong><span>Mare Tranquillitatis · vacuum</span><small>g = 1.62 m/s²</small></button><button id="destination-mars" aria-pressed="false"><strong>Mars</strong><span>Jezero · red desert</span><small>g = 3.73 m/s²</small></button></div>
-<<<<<<< HEAD
-          <div class="experience-picker" role="group" aria-label="Game experience"><button id="mode-expedition" aria-pressed="true">Guided outpost mission<small>Seven decisions · crew, EVA and science</small></button><button id="mode-training" aria-pressed="false">Flight school<small>Ten practical lessons per world</small></button></div><p id="journey-distance"></p><small id="journey-distance-basis"></small>
-=======
           <div class="experience-picker" role="group" aria-label="Game experience"><button id="mode-expedition" aria-pressed="true">Outpost mission<small>Seven decisions · crew, EVA and science</small></button><button id="mode-training" aria-pressed="false">Flight school<small>Ten practical lessons per world</small></button></div><p id="journey-distance"></p><small id="journey-distance-basis"></small>
->>>>>>> origin/main
           <button class="primary-button" id="board-spaceship">Board the spaceship →</button><button class="secondary-button" id="continue-surface" hidden>Continue saved surface training →</button>
         </section>
         <section class="flight-instruments" id="flight-instruments" aria-label="Calculated flight telemetry">
@@ -60,24 +45,10 @@
           <div class="flight-distance-readout"><small>DISTANCE COVERED / PLANNED</small><strong id="flight-distance"></strong><div><i id="flight-progress"></i></div></div><p id="flight-time"></p><small>Calculated training model · dated positions · compressed journey</small>
         </section>
         <section class="flight-instruction" id="flight-instruction"><span class="eyebrow" id="flight-action-kicker">ASTRA · NEXT ACTION</span><h2 id="flight-action-title"></h2><p id="flight-action-text"></p><button class="primary-button" id="launch-spacecraft" hidden>Press cockpit LAUNCH button · E</button><button class="secondary-button" id="cockpit-view" hidden>Pilot view · F</button><button class="primary-button" id="disembark-spacecraft" hidden>Step onto the surface →</button></section>
-<<<<<<< HEAD
-        <button class="secondary-button flight-skip" id="flight-skip" hidden>Skip this flight segment →</button><section id="flight-event" class="flight-event" data-state="fault" hidden><span class="eyebrow" id="flight-event-eyebrow">ASTRA / MID-CRUISE DECISION</span><h2 id="flight-event-title">Auxiliary bus fault</h2><svg class="bus-diagram" viewBox="0 0 320 132" role="img" aria-labelledby="bus-diagram-title"><title id="bus-diagram-title">Odyssey power circuit: main bus, faulty auxiliary bus, downlink and backup battery</title>
-<path class="wire w-main" d="M84 38H120"/><path class="wire w-down" d="M200 38H218M246 38H236"/><path class="wire w-batt" d="M160 96V58"/>
-<g class="breaker"><circle cx="218" cy="38" r="3"/><circle cx="246" cy="38" r="3"/><path class="breaker-lever" d="M218 38L246 38"/></g>
-<g class="node n-main"><rect x="8" y="20" width="76" height="36" rx="7"/><text x="46" y="36">MAIN BUS</text><text class="sub" x="46" y="48">life support</text></g>
-<g class="node n-aux"><rect x="120" y="18" width="80" height="40" rx="7"/><text x="160" y="35">AUX BUS</text><text class="sub" id="bus-aux-state" x="160" y="48">FAULT</text><path class="bolt" d="M188 12l-7 12h6l-5 11 11-14h-6l5-9z"/></g>
-<g class="node n-down"><rect x="250" y="20" width="64" height="36" rx="7"/><text x="282" y="36">DOWNLINK</text><text class="sub" id="bus-down-state" x="282" y="48">100%</text></g>
-<g class="node n-batt"><rect x="118" y="96" width="84" height="30" rx="7"/><text x="160" y="110">BACKUP</text><text class="sub" x="160" y="121">−3% fuel</text></g>
-<text class="tag tag-cut" x="232" y="64">circuit cut</text><text class="tag tag-ok" x="160" y="76">bus restored</text></svg><p id="flight-event-readout"></p><p id="flight-event-status" class="flight-event-status" aria-live="polite"></p><div id="flight-event-choices"><button id="flight-choice-isolate" class="primary-button">Isolate the nonessential circuit</button><button id="flight-choice-backup" class="secondary-button">Use backup power</button></div></section><section class="landing-controls" id="landing-controls" aria-label="Landing velocity and attitude controls" hidden>
-          <div class="landing-camera-tools"><small id="landing-camera-hint">Drag to orbit · 360° view</small><button class="secondary-button" id="landing-camera-view">Pilot view · F</button></div><div class="landing-heading"><span>FINAL APPROACH · FIX YOUR PARAMETERS</span><strong id="landing-step"></strong></div>
-          <div class="landing-gauges"><div class="velocity-gauge"><strong>DESCENT VELOCITY</strong><div class="vertical-scale" id="velocity-scale" role="meter" aria-label="Landing descent velocity" aria-valuemin="0" aria-valuemax="12"><span class="speed-safe"></span><i id="velocity-arrow">▶</i><span class="scale-top">12</span><span class="scale-bottom">0</span></div><output id="landing-velocity"></output><small>Safe: 1–3 m/s</small></div>
-          <div class="attitude-gauge"><strong>ATTITUDE FROM VERTICAL</strong><output id="landing-angle"></output><div class="horizontal-scale" id="angle-scale" role="meter" aria-label="Landing angle from vertical" aria-valuemin="-15" aria-valuemax="15"><span class="angle-safe"></span><i id="angle-arrow">▼</i><span class="angle-min">−15°</span><span class="angle-center">0°</span><span class="angle-max">+15°</span></div><small>Safe: −5° to +5°</small><button class="primary-button" id="landing-lock">Lock velocity · Space</button></div></div><p id="landing-feedback" role="status"></p><details id="landing-assistance"><summary>Steady landing controls · optional</summary><label>Descent speed · aim for 1–3 m/s<input id="landing-speed-input" type="range" min="0" max="12" step="0.1" value="2"></label><label>Tilt · aim within −5° to +5°<input id="landing-angle-input" type="range" min="-15" max="15" step="0.1" value="0"></label><p>Move a slider, then use Lock. The same safety check applies. Bands and fast descent are teaching assumptions.</p></details>
-=======
         <button class="secondary-button flight-skip" id="flight-skip" hidden>Skip this flight segment →</button><section id="flight-event" class="flight-event" hidden><span class="eyebrow">ASTRA / MID-CRUISE DECISION</span><h2>Auxiliary bus fault</h2><p id="flight-event-readout"></p><button id="flight-choice-isolate" class="primary-button">Isolate the nonessential circuit</button><button id="flight-choice-backup" class="secondary-button">Use backup power</button></section><section class="landing-controls" id="landing-controls" aria-label="Landing velocity and attitude controls" hidden>
           <div class="landing-camera-tools"><small id="landing-camera-hint">Drag to orbit · 360° view</small><button class="secondary-button" id="landing-camera-view">Pilot view · F</button></div><div class="landing-heading"><span>FINAL APPROACH · FIX YOUR PARAMETERS</span><strong id="landing-step"></strong></div>
           <div class="landing-gauges"><div class="velocity-gauge"><strong>DESCENT VELOCITY</strong><div class="vertical-scale" id="velocity-scale" role="meter" aria-label="Landing descent velocity" aria-valuemin="0" aria-valuemax="12"><span class="speed-safe"></span><i id="velocity-arrow">▶</i><span class="scale-top">12</span><span class="scale-bottom">0</span></div><output id="landing-velocity"></output><small>Safe: 1–3 m/s</small></div>
           <div class="attitude-gauge"><strong>ATTITUDE FROM VERTICAL</strong><output id="landing-angle"></output><div class="horizontal-scale" id="angle-scale" role="meter" aria-label="Landing angle from vertical" aria-valuemin="-15" aria-valuemax="15"><span class="angle-safe"></span><i id="angle-arrow">▼</i><span class="angle-min">−15°</span><span class="angle-center">0°</span><span class="angle-max">+15°</span></div><small>Safe: −5° to +5°</small><button class="primary-button" id="landing-lock">Lock velocity · Space</button></div></div><p id="landing-feedback" role="status"></p>
->>>>>>> origin/main
         </section>
       </section>
       <div id="solar-labels" class="solar-labels" aria-hidden="true" hidden></div><div class="cinema-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -116,30 +87,18 @@
         <div class="briefing-tags"><span>NASA SURFACE TERRAIN</span><span id="briefing-skill">EVA NAVIGATION & OBSERVATION</span></div>
         <button class="primary-button" id="start-button">Start training →</button>
         <div class="briefing-foot"><span class="small-orbit" aria-hidden="true">✦</span> Follow the Next action card. WASD moves; E interacts; Q scans.</div>
-<<<<<<< HEAD
-        <div class="music-credit"><span class="equalizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span> Quiet space ambience · sound starts after a click</div>
-=======
         <div class="music-credit"><span class="equalizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span> Original adaptive soundtrack · starts with play</div>
->>>>>>> origin/main
       </div>
 
       <div class="location-card" id="location-card">
         <div class="location-top"><span class="status-dot"></span><span id="actor-mode">ASTRONAUT / EVA</span><span class="location-id">A-01</span></div>
         <div class="coordinates"><span id="latitude">—</span><span class="coord-divider">/</span><span id="longitude">—</span></div>
-<<<<<<< HEAD
-        <div class="surface-environment" id="surface-environment">MOON · g 1.62 m/s² · vacuum</div><div class="surface-weather" id="surface-weather" role="status" aria-live="polite" hidden><span id="surface-weather-icon" aria-hidden="true"></span><strong id="surface-weather-label"></strong><small id="surface-weather-note"></small></div><div class="location-bottom"><span id="elevation">— m</span><span id="distance-travelled">0.00 km travelled</span></div>
-      </div>
-      <div class="interaction-prompt" id="interaction-prompt" hidden><button id="interact-button"><kbd>E</kbd><span id="interact-label">Interact</span><span aria-hidden="true">↗</span></button></div>
-      <div class="mission-notice" id="notice" role="status" hidden></div>
-      <div class="weather-chip" id="weather-chip" hidden role="status" aria-live="polite"><span class="weather-icon" id="weather-icon" aria-hidden="true"></span><span><strong id="weather-label">Weather</strong><small id="weather-note"></small></span></div><div class="paused-banner" id="paused-banner" hidden><span>EXPEDITION PAUSED</span><button id="resume-button">Resume <span aria-hidden="true">→</span></button></div>
-=======
         <div class="surface-environment" id="surface-environment">MOON · g 1.62 m/s² · vacuum</div><div class="location-bottom"><span id="elevation">— m</span><span id="distance-travelled">0.00 km travelled</span></div>
       </div>
       <div class="interaction-prompt" id="interaction-prompt" hidden><button id="interact-button"><kbd>E</kbd><span id="interact-label">Interact</span><span aria-hidden="true">↗</span></button></div>
       <div class="mission-notice" id="notice" role="status" hidden></div>
       <div class="paused-banner" id="paused-banner" hidden><span>EXPEDITION PAUSED</span><button id="resume-button">Resume <span aria-hidden="true">→</span></button></div>
       <div class="world-loading" id="loading"><span class="loading-orbit"></span><p>Preparing your expedition…</p><small>Loading the lunar terrain and mission data.</small></div>
->>>>>>> origin/main
       <div class="touch-controls" id="touch-controls" aria-label="Touch movement controls">
         <div class="d-pad"><button data-direction="up" aria-label="Move up">↑</button><button data-direction="left" aria-label="Move left">←</button><button data-direction="down" aria-label="Move down">↓</button><button data-direction="right" aria-label="Move right">→</button></div>
         <button class="touch-action" id="touch-interact">E <span>ACT</span></button>
@@ -167,11 +126,7 @@
         <ol class="objectives" id="objectives"></ol>
         <button class="route-button" id="route-button">Go to objective <span aria-hidden="true">↗</span></button>
       </section>
-<<<<<<< HEAD
-      <section id="outpost-card" class="outpost-card" hidden><div class="panel-title"><span>HAVEN / FOUR-PERSON CREW</span><span id="outpost-phase"></span></div><div class="core-resources"><div><small>POWER</small><strong id="core-power"></strong></div><div><small>OXYGEN · ALL CREW</small><strong id="core-oxygen"></strong></div><div><small>CREW CONDITION</small><strong id="core-health"></strong></div></div><details><summary>Advanced habitat instruments</summary><div id="outpost-resources" class="outpost-grid"></div><small>Habitat inventory is separate from the astronaut’s suit. Radiation and crop growth are teaching rules.</small></details><button id="greenhouse-inspect" class="secondary-button">Inspect greenhouse ↗</button><details><summary>Earth communication</summary><p id="earth-reply"></p><button id="earth-request" class="secondary-button">Ask Earth · 0.15 kWh</button><small>One request per stage. Return to play to advance the reply timer.</small></details><p id="outpost-power"></p><p id="outpost-alert"></p><button class="secondary-button" id="outpost-forecast">ASTRA: resupply forecast ↗</button><button id="save-checkpoint" class="secondary-button">Save current checkpoint</button><button id="local-sortie" class="secondary-button">Board Odyssey for orbital practice ↗</button><small>At Haven · 5 emergency fuel units. Crew consumes resources during the flight; check the resupply forecast first.</small></section><section class="telemetry-card" id="telemetry-card">
-=======
       <section id="outpost-card" class="outpost-card" hidden><div class="panel-title"><span>HAVEN / FOUR-PERSON CREW</span><span id="outpost-phase"></span></div><div id="outpost-resources" class="outpost-grid"></div><p id="outpost-power"></p><p id="outpost-alert"></p><button class="secondary-button" id="outpost-forecast">ASTRA: resupply forecast ↗</button><button id="save-checkpoint" class="secondary-button">Save current checkpoint</button><button id="local-sortie" class="secondary-button">Board Odyssey for orbital practice ↗</button><small>At Haven · 5 emergency fuel units. Crew consumes resources during the flight; check the resupply forecast first.</small></section><section class="telemetry-card" id="telemetry-card">
->>>>>>> origin/main
         <div class="panel-title"><span>YOUR RESERVES</span><span class="subtle" id="equipment-label">EVA SUIT</span></div>
         <div class="resource"><div><span>Oxygen</span><strong id="oxygen-value">—</strong></div><div class="resource-bar" role="progressbar" aria-label="Oxygen reserve" aria-valuemin="0" aria-valuemax="100"><span id="oxygen-bar"></span></div><small id="oxygen-detail">Nominal minutes remaining</small></div>
         <div class="resource"><div><span id="battery-title">Suit energy</span><strong id="battery-value">—</strong></div><div class="resource-bar energy" role="progressbar" aria-label="Battery reserve" aria-valuemin="0" aria-valuemax="100"><span id="battery-bar"></span></div><small id="battery-detail">— Wh available</small></div>
@@ -220,14 +175,7 @@
     <div class="circuit-design" id="circuit-design"></div>
     <div class="circuit-frame" id="circuit-frame"><div class="circuit-input" id="circuit-input"><span class="circuit-indicator"></span><span>INPUT</span></div><div class="circuit-grid" id="circuit-grid" aria-label="Rotatable circuit tiles"></div><div class="circuit-output" id="circuit-output"><span class="circuit-indicator" id="output-indicator"></span><span>OUTPUT</span></div></div>
     <div class="repair-feedback"><span id="circuit-feedback">Signal not connected</span><span id="circuit-moves">0 rotations</span></div>
-<<<<<<< HEAD
-    <div class="puzzle-timer" id="puzzle-timer" data-level="ok" role="timer" aria-live="off"><div class="puzzle-timer-row"><span class="eyebrow">TIME LIMIT</span><strong id="puzzle-time">1:00</strong></div><div class="puzzle-timer-bar"><i id="puzzle-timer-fill"></i></div><p id="puzzle-timer-note">You have 45 seconds. If time runs out you can buy 15 more seconds for 3% oxygen, twice.</p>
-      <div class="puzzle-extend" id="puzzle-extend" role="alertdialog" aria-labelledby="puzzle-extend-text" hidden><p id="puzzle-extend-text">Time’s up.</p><div class="puzzle-extend-actions"><button type="button" class="primary-button" id="puzzle-extend-button">+15 s · uses 3% O₂</button><button type="button" class="secondary-button" id="puzzle-restart-button">Restart level</button></div></div></div>
-    <div class="puzzle-oxygen"><span>Suit oxygen <b id="puzzle-oxygen-level">100%</b></span><span>Extra time left <b id="puzzle-extensions">2 × 15 s</b></span></div>
-    <div class="repair-hint"><kbd>↻</kbd> Click a tile to turn it 45° clockwise; right-click (or Shift+click) turns it back. Mission time is paused; the repair clock is not.</div>
-=======
     <div class="repair-hint"><kbd>↻</kbd> Click a tile to rotate it 90°. Mission time is paused.</div>
->>>>>>> origin/main
     <button class="primary-button" id="apply-repair" disabled>Apply repair <span aria-hidden="true">→</span></button>
     </div>
   </dialog>
@@ -235,11 +183,7 @@
   <dialog id="story-dialog" class="story-dialog" aria-labelledby="story-title">
     <div class="story-vignette" aria-hidden="true"></div>
     <div class="story-cut" id="story-cut" aria-hidden="true"></div>
-<<<<<<< HEAD
-    <div class="story-topbar"><a class="story-brand" aria-label="LUNA">LUNA<span>BEYOND THE LIFELINE</span></a><div class="story-actions"><button class="secondary-button" id="story-sound">Begin story with music</button><button class="secondary-button" id="story-skip">Skip story →</button></div></div>
-=======
     <div class="story-topbar"><a class="story-brand" aria-label="LUNA">LUNA<span>BEYOND THE LIFELINE</span></a><div class="story-actions"><button class="secondary-button" id="story-sound">Enable music</button><button class="secondary-button" id="story-skip">Skip story →</button></div></div>
->>>>>>> origin/main
     <div class="story-caption-card" id="story-caption-card" role="status"><div class="eyebrow" id="story-chapter">CHAPTER 01 / A NEW FRONTIER</div><h2 id="story-title">Somewhere beyond home.</h2><div class="story-dialogue"><span id="story-speaker">MISSION CONTROL</span><p id="story-caption">Your expedition is about to begin.</p></div></div>
     <div class="story-letterbox top" aria-hidden="true"></div><div class="story-letterbox bottom" aria-hidden="true"></div>
   </dialog>
@@ -249,21 +193,17 @@
     <div class="debrief-emblem" id="debrief-emblem" aria-hidden="true">✦</div><h2 id="debrief-title">Echo is home<span>.</span></h2><p id="debrief-description">You restored the signal and returned the rover to Haven.</p>
     <div class="debrief-rank" id="debrief-rank">MISSION SPECIALIST</div>
     <div class="debrief-metrics" id="debrief-metrics"></div><div class="debrief-learning" id="debrief-learning"></div>
-<<<<<<< HEAD
-    <section class="recap-quiz" id="recap-quiz" hidden aria-labelledby="recap-title"><div class="eyebrow">MISSION RECAP QUIZ</div><h3 id="recap-title">Mission recap</h3><p class="recap-intro" id="recap-intro">Answer at least 2 of 4 correctly to continue. A wrong answer gives you a hint and one more try.</p><ol id="recap-questions"></ol><p id="recap-score" role="status"></p><button type="button" class="secondary-button" id="recap-retry" hidden>Try a new recap quiz ↻</button></section>
-=======
->>>>>>> origin/main
     <div class="dialog-actions"><button class="primary-button" id="next-level-button" hidden>Continue to next level →</button><button class="secondary-button" id="replay-button">Retry level ↻</button><button class="secondary-button" id="restart-button">Restart level</button></div>
     <div class="skill-check" id="skill-check" hidden><div class="eyebrow">OPTIONAL KNOWLEDGE CHECK · +100 XP</div><h3 id="review-question"></h3><div id="review-answers"></div><p id="review-feedback" role="status"></p></div>
     <div class="course-certificate" id="course-certificate" hidden></div>
     <div class="debrief-journal" id="debrief-journal"></div>
   </dialog>
 
-  <dialog id="data-dialog" class="data-dialog"><p id="donki-context" class="data-context">DONKI archive status loading…</p>
+  <dialog id="data-dialog" class="data-dialog">
     <div class="dialog-heading"><div class="eyebrow">THE SCIENCE BEHIND THE ADVENTURE</div><button class="dialog-close" data-close aria-label="Close data and science">×</button></div>
     <h2>Real data. Clear assumptions<span>.</span></h2><p class="dialog-description">Terrain and sky geometry have source records. Outpost hazards, reconstructed microdetail, resource rates and flight dynamics are educational models. See the scientific-accuracy note in the source download.</p>
     <div id="source-cards"></div>
-    <details class="assumptions" open><summary>Mission assumptions & limitations</summary><ul id="assumptions-list"></ul><p>ASTRA uses contextual rules grounded in the mission state. The ten lessons, equipment targets and power budgets are authored learning exercises. Greenhouse crops use an accelerated growth rule, not a real plant-growth prediction. The shelter and airlock drills model training procedures. Solar output and radio quality are game models; collected rocks and supply crates are fictional. Multiplayer is not included.</p></details>
+    <details class="assumptions" open><summary>Mission assumptions & limitations</summary><ul id="assumptions-list"></ul><p>ASTRA uses contextual rules grounded in the mission state. The ten lessons, equipment targets and power budgets are authored learning exercises. Greenhouse demand is a simplified power allocation, not a crop-growth simulation. The shelter and airlock drills model training procedures. Solar output and radio quality are game models; collected rocks and supply crates are fictional. Multiplayer is not included.</p></details>
     <div class="data-footer">Independent educational prototype · no NASA endorsement implied</div>
   </dialog>
 
@@ -282,17 +222,15 @@
     <div class="dialog-heading"><div class="eyebrow">GAME SETTINGS</div><button class="dialog-close" data-close aria-label="Close settings">×</button></div>
     <h2 id="settings-title">Make the mission yours.</h2>
     <div class="game-settings">
-      <label class="volume-control" for="music-volume"><span>Background music volume</span><output id="music-volume-value" for="music-volume">45%</output><input id="music-volume" type="range" min="0" max="100" value="45"></label>
-      <button class="secondary-button settings-toggle" id="music-toggle" aria-pressed="true">Background music on</button>
-      <button class="secondary-button" id="effects-toggle" aria-pressed="true">Sound effects on</button>
-<button class="secondary-button" id="story-replay">Replay opening story</button>
-<button class="secondary-button settings-toggle" id="motion-button" aria-pressed="false">Full cinematic motion</button>
+      <label class="volume-control" for="music-volume"><span>Music and effects volume</span><output id="music-volume-value" for="music-volume">45%</output><input id="music-volume" type="range" min="0" max="100" value="45"></label>
+      <button class="secondary-button settings-toggle" id="music-toggle" aria-pressed="true">Music and effects on</button>
+      <button class="secondary-button settings-toggle" id="motion-button" aria-pressed="false">Full cinematic motion</button>
       <button class="secondary-button settings-toggle" id="opening-toggle" aria-pressed="true">Opening animation on</button>
       <p>The opening plays once when you enter the game, then continues into your training. This setting applies on your next visit; Skip story skips only the current opening.</p>
       <button class="secondary-button settings-toggle" id="tutorial-setting-toggle" aria-pressed="true">Tutorial on</button>
       <p id="tutorial-setting">Action-by-action guidance is enabled.</p>
       <button class="secondary-button" id="tutorial-restart">Show tutorial for this level ↗</button>
-      <p id="performance-readout">Frame measurements appear during play.</p><label class="astronomy-control">Graphics quality<select id="graphics-quality"><option value="low">Low · 1× pixels / 512 shadows</option><option value="balanced" selected>Balanced · 1.5× pixels / 2048 shadows</option><option value="high">High · 2× pixels / 4096 shadows</option></select></label><label class="astronomy-control">Weather<select id="weather-mode"><option value="auto" selected>Automatic · changes every 6 mission hours</option><option value="clear">Always calm</option><option value="windy">Always windy / active</option><option value="storm">Always stormy</option></select></label><label class="astronomy-control"><span><input id="orbit-lines" type="checkbox" checked> Show overview orbit guides</span></label><button class="secondary-button settings-toggle" id="labels-button" aria-pressed="true">High contrast world labels on</button>
+      <label class="astronomy-control">Graphics quality<select id="graphics-quality"><option value="low">Low · 1× pixels / 512 shadows</option><option value="balanced" selected>Balanced · 1.5× pixels / 1024 shadows</option><option value="high">High · 2× pixels / 2048 shadows</option></select></label><label class="astronomy-control"><span><input id="orbit-lines" type="checkbox" checked> Show overview orbit guides</span></label><button class="secondary-button settings-toggle" id="labels-button" aria-pressed="true">High contrast world labels on</button>
       <button class="secondary-button settings-toggle" id="reset-camera">Reset camera and follow astronaut ↺</button>
       <button class="secondary-button settings-toggle" id="reset-panels">Reset tutorial and ASTRA positions ↺</button>
       <small>Music, motion, labels, tutorial preference, badges and unlocked levels are remembered in this browser when storage is available. Showing the tutorial keeps your current progress.</small>
@@ -304,14 +242,12 @@
     <div class="dialog-heading"><div class="eyebrow">JUNIOR ASTRONAUT ACADEMY</div><button class="dialog-close" data-close aria-label="Close levels">×</button></div><h2 id="levels-title">Your path to the crew.</h2><p class="dialog-description">Ten practical missions. Complete each field task to earn a badge and unlock the next mission. Knowledge checks are optional. Selecting a level begins that lesson from its briefing.</p><div id="level-list"></div>
   </dialog>
 
-  <dialog id="decision-dialog" class="decision-dialog" aria-labelledby="decision-title"><div class="dialog-heading"><div class="eyebrow" id="decision-kicker">HAVEN / OPERATIONS</div><button class="dialog-close" data-close aria-label="Close equipment controls">×</button></div><h2 id="decision-title"></h2><p id="decision-description" class="dialog-description"></p><div id="decision-task" class="decision-task"><span id="decision-task-instruction"></span><button id="decision-task-action" class="primary-button"></button></div><details><summary>Inspect current habitat inventory · free</summary><div id="decision-resources" class="outpost-grid"></div></details><p id="decision-astra" class="decision-astra" role="status"></p><div id="decision-options" class="decision-options"></div><section id="decision-review" hidden><h3>Review the consequence</h3><pre id="decision-forecast"></pre><p>The forecast holds current sunlight and weather. Confirm applies the action and its time cost once.</p><button id="decision-confirm" class="primary-button">Confirm plan</button></section><small>Game assumptions · previews calculate the selected action and its mission time. Closing this panel keeps the current stage. Decisions save a checkpoint.</small></dialog><dialog id="systems-dialog" class="systems-dialog" aria-labelledby="systems-title">
+  <dialog id="decision-dialog" class="decision-dialog" aria-labelledby="decision-title"><div class="dialog-heading"><div class="eyebrow" id="decision-kicker">HAVEN / OPERATIONS</div><button class="dialog-close" data-close aria-label="Close equipment controls">×</button></div><h2 id="decision-title"></h2><p id="decision-description" class="dialog-description"></p><div id="decision-task" class="decision-task"><span id="decision-task-instruction"></span><button id="decision-task-action" class="primary-button"></button></div><div id="decision-resources" class="outpost-grid"></div><p id="decision-astra" class="decision-astra" role="status"></p><div id="decision-options" class="decision-options"></div><small>Game assumptions · previews calculate the selected action and its mission time. Closing this panel keeps the current stage. Decisions save a checkpoint.</small></dialog><dialog id="systems-dialog" class="systems-dialog" aria-labelledby="systems-title">
     <div class="dialog-heading"><div class="eyebrow">HAVEN / SYSTEMS WORKBENCH</div><button class="dialog-close" data-close aria-label="Close systems workbench">×</button></div><h2 id="systems-title">Keep the outpost alive.</h2><p class="dialog-description" id="systems-description"></p>
     <div class="power-supply"><strong id="power-supply">12 kW supply</strong><span id="power-budget">—</span></div>
     <div class="power-rows" id="power-rows"><label for="power-life"><span>Life support <small id="demand-life"></small></span><output id="value-life">2 kW</output><input id="power-life" type="range" min="0" max="12" step="1" value="2"></label><label for="power-food"><span>Greenhouse <small id="demand-food"></small></span><output id="value-food">2 kW</output><input id="power-food" type="range" min="0" max="12" step="1" value="2"></label><label for="power-comms"><span>Communications <small id="demand-comms"></small></span><output id="value-comms">1 kW</output><input id="power-comms" type="range" min="0" max="12" step="1" value="1"></label></div>
     <label class="seal-control" id="seal-control" hidden><input id="shelter-seal" type="checkbox"> Seal the shelter and confirm crew inside</label><p id="power-feedback" role="status"></p><button class="primary-button" id="apply-power" disabled>Confirm systems plan →</button>
   </dialog>
-  <dialog id="consequence-dialog" class="help-dialog" aria-labelledby="consequence-title"><div class="eyebrow">YOUR DECISION / YOUR CONSEQUENCE</div><h2 id="consequence-title">Here is what changed.</h2><pre id="consequence-text"></pre><button id="consequence-next" class="primary-button">Continue</button></dialog>
-<dialog id="greenhouse-dialog" class="help-dialog" aria-labelledby="greenhouse-title"><div class="dialog-heading"><div class="eyebrow">HAVEN / GREENHOUSE</div><button data-close class="dialog-close" aria-label="Close greenhouse">×</button></div><h2 id="greenhouse-title">Growing tomorrow’s food.</h2><pre id="greenhouse-readout"></pre><p>Plants grow in an accelerated teaching cycle. Real crops take far longer. The illuminated dome and botanist show the system you are managing.</p><button id="greenhouse-route" class="primary-button">Walk to the greenhouse</button><button data-close class="secondary-button">Back to mission</button></dialog>
-<script src="game.js?v=1.3.3-merged" defer></script>
+  <script src="game.js?v=1.2.3-local" defer></script>
 </body>
 </html>

@@ -16,9 +16,6 @@ export class TrainingMission extends Mission {
     this.loadLevel(this.levelIndex);
   }
   get lesson(){return this.academy.levels[this.levelIndex];}
-  // Each later level gets a harder circuit: level 2 (systems) 3×3, level 3 relay 4×4, level 3 rover harder still.
-  circuitDifficulty(type){return Math.max(0,2*this.levelIndex-1+(type==='rover'?1:0));}
-  restartLevel(){return this.loadLevel(this.levelIndex);}
   get isTraining(){return true;}
   get rank(){return this.completed.length?this.academy.levels[Math.max(...this.completed.map(r=>this.academy.levels.findIndex(l=>l.id===r.id)))].rank:'Junior Cadet';}
   get xp(){return this.completed.reduce((n,r)=>n+r.xp,0);}
@@ -28,7 +25,7 @@ export class TrainingMission extends Mission {
   loadLevel(index){
     if(!Number.isInteger(index)||index<0||index>this.unlocked)return false;
     this.levelIndex=index;this.objects=copy(this.original.objects);this.science=copy(this.original.science);super.reset();
-    this.reviewPassed=false;this.recapPassed=false;this.state.training={phase:'',inspected:[],powerBus:false,allocations:null,sealed:false};
+    this.reviewPassed=false;this.state.training={phase:'',inspected:[],powerBus:false,allocations:null,sealed:false};
     const s=this.state,id=this.lesson.id;
     const parking=this.config.physicalScale?6/this.terrain.cell:2;
     const path=this.terrain.route(s.player,this.objects.relay,this.config.walkMaxSlopeDegrees);
@@ -52,7 +49,7 @@ export class TrainingMission extends Mission {
     }
     s.phase=s.training.phase==='relay'?'relay':s.training.phase;this.state.journal=[];this.record('briefing',this.lesson.title+' prepared.');this.save();return true;
   }
-  nextLevel(){if(this.state.status!=='complete'||!this.recapPassed||!this.completed.some(r=>r.id===this.lesson.id)||this.levelIndex>=this.academy.levels.length-1)return false;return this.loadLevel(this.levelIndex+1);}
+  nextLevel(){if(this.state.status!=='complete'||!this.completed.some(r=>r.id===this.lesson.id)||this.levelIndex>=this.academy.levels.length-1)return false;return this.loadLevel(this.levelIndex+1);}
   target(){
     if(!this.academy)return super.target();const s=this.state,id=this.lesson.id;
     if(id==='recovery')return s.phase==='return'&&!s.rover.occupied?s.rover:super.target();
@@ -104,7 +101,7 @@ export class TrainingMission extends Mission {
     if(this.state.status!=='playing')return;const n=this.nearby(),s=this.state;
     if(!n){this.notify('Follow your next-action card. Use Go to objective to reach the marked destination.');return;}
     if(n.type==='outpost'){
-      this.repairType='outpost';s.status='repair';this.route=null;this.circuit=new Circuit(this.config.seed+88,'outpost',this.circuitDifficulty('outpost'));this.events.push({type:'repair'});return;
+      this.repairType='outpost';s.status='repair';this.route=null;this.circuit=new Circuit(this.config.seed+88,'outpost');this.events.push({type:'repair'});return;
     }
     if(n.type==='allocation'||n.type==='shelter'){this.route=null;this.events.push({type:'systems',emergency:n.type==='shelter'});return;}
     if(n.type==='drill'){this.route=null;this.events.push({type:'drill'});return;}
@@ -176,11 +173,8 @@ export class TrainingMission extends Mission {
     this.record('equipment-action',action.replaceAll('-',' ')+' completed.');
     if(done){d.complete=true;this.finishTraining();}else this.syncTraining();return true;
   }
-  // The badge and the next level are earned only after the mission recap quiz is passed (2 of 4 correct).
-  passRecap(){if(this.state.status!=='complete')return false;this.recapPassed=true;this.awardField();return true;}
-  get awaitingRecap(){return this.state.status==='complete'&&!this.recapPassed;}
   awardField(){
-    if(this.state.status!=='complete'||!this.recapPassed||this.completed.some(r=>r.id===this.lesson.id))return;
+    if(this.state.status!=='complete'||this.completed.some(r=>r.id===this.lesson.id))return;
     this.completed.push({id:this.lesson.id,qualified:true,fieldComplete:true,reviewPassed:false,xp:this.academy.rewards.stageCompletionXp,timeMinutes:this.state.time/60,oxygenPercent:this.state.oxygen/this.config.suit.oxygenMinutes*100});
     this.unlocked=Math.min(this.academy.levels.length-1,Math.max(this.unlocked,this.levelIndex+1));this.save();
   }
@@ -190,7 +184,6 @@ export class TrainingMission extends Mission {
   }
   qualify(answer){
     if(this.state.status!=='complete')return{correct:false,message:'Complete the field tasks first.'};
-    if(!this.recapPassed)return{correct:false,message:'Pass the mission recap quiz first.'};
     if(Number(answer)!==this.lesson.correct)return{correct:false,message:this.lesson.explanation+' Try the question again.'};
     this.reviewPassed=true;this.awardField();const result=this.completed.find(r=>r.id===this.lesson.id);
     result.reviewPassed=true;result.xp=this.academy.rewards.stageCompletionXp+this.academy.rewards.correctReviewXp;this.save();
@@ -200,7 +193,6 @@ export class TrainingMission extends Mission {
   nextAction(){
     const s=this.state,n=this.nearby(),id=this.lesson.id;
     if(s.status==='ready')return{title:'Start your lesson',text:this.lesson.brief,action:'Start level '+(this.levelIndex+1),command:'start'};
-    if(s.status==='complete'&&!this.recapPassed)return{title:'Pass the mission recap',text:'Answer at least 2 of the 4 recap questions correctly to earn your badge'+(this.levelIndex<this.academy.levels.length-1?' and unlock level '+(this.levelIndex+2):'')+'.',action:'Take the recap quiz',command:'review'};
     if(s.status==='complete')return{title:'Level complete · badge earned',text:this.levelIndex<this.academy.levels.length-1?'Your practical task unlocked the next level. Continue when you are ready.':'You completed the full training course. Review your badges and replay any lesson.',action:this.levelIndex<this.academy.levels.length-1?'Continue to level '+(this.levelIndex+2):'View training record',command:'advance'};
     if(s.status==='failed')return{title:'Try a safer approach',text:'Replay the checkpoint and check the Lifeline before taking a detour.',action:'Review attempt',command:'review'};
     if(s.status==='repair')return{title:'Reconnect the circuit',text:this.circuit.instructions+' Then apply the repair.',action:'Show a repair hint',command:'hint'};

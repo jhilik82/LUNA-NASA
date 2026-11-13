@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import {createGreenhouse} from './greenhouse.js';
-import {CompanionCrew} from './companion-crew.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ScientificSurfaceSky } from './scientific-sky.js';
 import { SurfaceSky } from './celestial.js';
@@ -8,7 +6,6 @@ import { clamp, randomGenerator } from './engine.js';
 import { WORLD_SCALE, isOccupied } from './world-layout.js';
 import { openingMotion, astronautPose, ballisticDust } from './animation.js';
 import { TrackingMaps } from './maps.js';
-import { batchStaticMeshes } from './static-batch.js';
 import { materialDetail } from './material-detail.js';
 import { surfaceMaterials, surfaceRockGeometry, applySurfaceMaps } from './surface-materials.js';
 import { referencePatches, surfaceGeometry, removePatchTriangles, layeredOutcropGeometry, surfaceSample, renderedSurfaceHeight } from './reference-geometry.js';
@@ -41,7 +38,7 @@ export class Renderer {
     this.device.toneMapping=THREE.ACESFilmicToneMapping;this.device.toneMappingExposure=1.15;this.device.outputColorSpace=THREE.SRGBColorSpace;
     this.buildTerrain();this.buildScenery();this.buildSky();
     this.footprints=new THREE.InstancedMesh(new THREE.PlaneGeometry(mission.config.world==='moon'?.19:.14,mission.config.world==='moon'?.34:.33).rotateX(-Math.PI/2),mission.config.world==='moon'?lunarImpressionMaterial('boot',this.unitsPerMetre):new THREE.MeshStandardMaterial({color:'#45413b',roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}),768);this.footprints.count=0;this.footprints.frustumCulled=false;this.footprintCursor=0;this.scene.add(this.footprints);
-    this.player=createAstronaut(this.mat);this.rover=createRover(this.mat,mission.config.world);batchStaticMeshes(this.player);batchStaticMeshes(this.rover);this.scene.add(this.player,this.rover);if(this.physical){this.player.scale.setScalar(.35*this.unitsPerMetre);this.rover.scale.setScalar(.7*this.unitsPerMetre);}this.buildCinematic();
+    this.player=createAstronaut(this.mat);this.rover=createRover(this.mat,mission.config.world);this.scene.add(this.player,this.rover);if(this.physical){this.player.scale.setScalar(.35*this.unitsPerMetre);this.rover.scale.setScalar(.7*this.unitsPerMetre);}this.buildCinematic();
     this.fieldSample=mesh(this.scene,new THREE.DodecahedronGeometry(1.1),this.mat.rock,[0,0,0],[1.3,.6,1],'collectable-field-sample');
     this.carriedSample=mesh(this.player,new THREE.CylinderGeometry(.32,.32,.85,12),this.mat.gold,[1.2,1.4,.45],null,'carried-sample');
     this.roverCargo=this.makeCargo();this.roverCargo.position.set(0,2.55,-2.2);this.rover.add(this.roverCargo);
@@ -56,7 +53,7 @@ export class Renderer {
     const orbitPlane=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({map:this.orbitTexture,depthTest:false,depthWrite:false,toneMapped:false}));
     this.orbitScene.add(orbitPlane);
     if(mission.solar)this.configureWorld(mission.config.world||'moon');
-    this.crew=new CompanionCrew(this);this.focus.copy(this.world(mission.state.player,this.cameraFocusHeight));this.updateActors(0);this.updateCamera(0);
+    this.focus.copy(this.world(mission.state.player,this.cameraFocusHeight));this.updateActors(0);this.updateCamera(0);
   }
   world(p, offset=0) {
     const t=this.mission.terrain;
@@ -83,8 +80,6 @@ export class Renderer {
       const p=mesh(this.cinemaGroup,geometry,this.mat.rock);p.castShadow=false;p.visible=false;
       this.cinemaDust.push({mesh:p,kind:i<80?'lander':'rover',angle:rng()*Math.PI*2,start:i<80?3.15+rng()*1.8:6.1+rng()*2.6,speed:i<80?3+rng()*8:.7+rng()*3,lift:.35+rng()*1.1,life:1.25+rng()*.85,size:.035+rng()*.085,side:rng()>.5?1:-1});
     }
-    // The lander and the mentor are drawn after landing for the rest of the session: merge their static parts.
-    batchStaticMeshes(this.lander,{protect:[this.plume,this.engineLight,...(this.lander.userData.legs||[]).map(leg=>leg.getObjectByName('landing-foot'))]});batchStaticMeshes(this.mentor);
   }
   positionLander(altitudeM=0,tilt=0){
     const u=this.unitsPerMetre;this.lander.position.copy(this.landingOrigin).add(new V(0,(altitudeM-.03)*u,0));this.lander.rotation.set(0,0,tilt);
@@ -121,14 +116,12 @@ export class Renderer {
     this.surfaceSamples=[...samples,surfaceSample(geometry,{x0:0,x1:t.width-1,y0:0,y1:t.height-1})];
     this.mat.rock.color.set('#ffffff');this.mat.rock.map=this.surfaceMaps.rock;this.mat.rock.bumpMap=this.surfaceMaps.rockRelief;this.mat.rock.bumpScale=.018*this.unitsPerMetre;this.mat.rock.metalness=0;
     this.buildRegionalGround();
-    // Pebbles never move: build them in one group and merge them into a single draw call.
-    const rng=randomGenerator(183),pebbles=new THREE.Group();pebbles.name='decorative-pebble';this.scene.add(pebbles);this.rocks=[pebbles];
+    const rng=randomGenerator(183);this.rocks=[];
     for(let i=0;i<210;i++) {
       const p={x:2+rng()*(t.width-4),y:2+rng()*(t.height-4)};
       if(this.mission.props.some(o=>Math.hypot(o.x-p.x,o.y-p.y)<3)||Math.hypot(p.x-this.mission.state.rover.x,p.y-this.mission.state.rover.y)<3)continue;
-      const size=(this.physical?.09+Math.pow(rng(),2)*.45:.15+rng()*.33)*this.unitsPerMetre;const rock=mesh(pebbles,surfaceRockGeometry(world),this.mat.rock,this.world(p,size*.12).toArray(),[size,size,size],'decorative-pebble');rock.rotation.y=rng()*Math.PI;
+      const size=(this.physical?.09+Math.pow(rng(),2)*.45:.15+rng()*.33)*this.unitsPerMetre;const rock=mesh(this.scene,surfaceRockGeometry(world),this.mat.rock,this.world(p,size*.12).toArray(),[size,size,size],'decorative-pebble');rock.rotation.y=rng()*Math.PI;this.rocks.push(rock);
     }
-    batchStaticMeshes(pebbles);
     if(this.physical&&world==='moon'){
       this.lunarClasts=new LunarClastField(this);this.rocks.push(this.lunarClasts.group);
     }else if(this.physical){
@@ -174,14 +167,12 @@ export class Renderer {
   buildScenery() {
     this.scenery=new THREE.Group();this.scenery.name='solid-equipment';this.scene.add(this.scenery);this.models=new Map();
     for(const p of this.mission.props) {
-      const g=p.kind==='greenhouse'?createGreenhouse(this.mat):p.kind==='habitat'?createHabitat(this.mat,this.mission.config.world):p.kind==='airlock'?createAirlock(this.mat):p.kind==='solar'?createSolar(this.mat,p.halfX/(this.physical?WORLD_SCALE/this.mission.terrain.cell:1),p.halfY/(this.physical?WORLD_SCALE/this.mission.terrain.cell:1)):p.kind==='relay'?createRelay(this.mat):p.kind==='lab'?createTrainingBench(this.mat):createTank(this.mat);
+      const g=p.kind==='habitat'?createHabitat(this.mat,this.mission.config.world):p.kind==='airlock'?createAirlock(this.mat):p.kind==='solar'?createSolar(this.mat,p.halfX/(this.physical?WORLD_SCALE/this.mission.terrain.cell:1),p.halfY/(this.physical?WORLD_SCALE/this.mission.terrain.cell:1)):p.kind==='relay'?createRelay(this.mat):p.kind==='lab'?createTrainingBench(this.mat):createTank(this.mat);
       if(this.physical)g.scale.setScalar(this.unitsPerMetre);g.position.copy(this.world(p));g.userData.layout=p;this.scenery.add(g);this.models.set(p.id,g);
       const corners=[[-1,-1],[1,-1],[-1,1],[1,1]].map(([x,y])=>this.world({x:p.x+x*(p.halfX||p.radius),y:p.y+y*(p.halfY||p.radius)}).y);
       const top=Math.max(g.position.y,...corners),low=Math.min(g.position.y,...corners)-.35;g.position.y=top;
       if(this.physical){for(const [x,z]of[[-1,-1],[1,-1],[-1,1],[1,1]]){const px=x*(p.halfX||p.radius)*.75,pz=z*(p.halfY||p.radius)*.75,bottom=this.world({x:p.x+px,y:p.y+pz}).y,height=Math.max(.08,(top-bottom)/this.unitsPerMetre);mesh(g,new THREE.CylinderGeometry(.14,.20,height,8),this.mat.silver,[px*WORLD_SCALE/this.unitsPerMetre,-height/2,pz*WORLD_SCALE/this.unitsPerMetre],null,'terrain-adjusted-support');mesh(g,new THREE.CylinderGeometry(.34,.34,.06,12),this.mat.dark,[px*WORLD_SCALE/this.unitsPerMetre,-height,pz*WORLD_SCALE/this.unitsPerMetre],null,'ground-contact-foot');}}
       else mesh(g,new THREE.BoxGeometry((p.halfX||p.radius)*16/this.unitsPerMetre,(top-low)/this.unitsPerMetre,(p.halfY||p.radius)*16/this.unitsPerMetre),this.mat.regolith,[0,-(top-low)/2,0],null,'equipment-footing');
-      // Static parts that share a material become one draw call; moving parts (userData references) stay separate.
-      batchStaticMeshes(g);
     }
     this.surveys=this.mission.science.map(p=>{const g=createSurvey(this.mat);g.position.copy(this.world(p));g.userData.site=p;this.scene.add(g);return g;});
     this.satellite=createSatellite(this.mat);this.satellite.position.copy(this.world(this.mission.objects.base,34)).add(new V(25,0,-20));this.satellite.visible=false;this.scene.add(this.satellite);
@@ -211,8 +202,7 @@ export class Renderer {
     }else{this.suitLamp=new THREE.PointLight('#e5edf5',this.physical?120*this.unitsPerMetre**2:4,this.physical?24*this.unitsPerMetre:36,2);this.scene.add(this.suitLamp);}
   }
   resize(width,height,dpr=1) {
-    // Renderer.renderScale (0.7–1) is lowered automatically when frames are slow; it applies to every world the game builds.
-    this.width=Math.max(1,width);this.height=Math.max(1,height);this.dpr=Math.min(dpr,this.maxDpr||1.6)*(Renderer.renderScale||1);
+    this.width=Math.max(1,width);this.height=Math.max(1,height);this.dpr=Math.min(dpr,this.maxDpr||1.6);
     this.device.setPixelRatio(this.dpr);this.device.setSize(this.width,this.height,false);this.camera.aspect=this.width/this.height;this.camera.updateProjectionMatrix();
     this.orbitCanvas.width=this.width;this.orbitCanvas.height=this.height;this.orbitTexture.needsUpdate=true;
   }
@@ -283,15 +273,9 @@ export class Renderer {
     const ahead=world.clone().sub(this.camera.position).dot(this.camera.getWorldDirection(new V()))>0;
     let visible=ahead;
     if(occlusion&&visible){
-      // This ray tests the whole terrain, so the answer is reused for 0.15 s unless the camera or the target moves.
-      const now=globalThis.performance?.now?.()??Date.now(),cache=this.occlusionCache,move=(this.physical?.25*this.unitsPerMetre:.5)**2;
-      if(cache&&cache.x===point.x&&cache.y===point.y&&now-cache.at<150&&cache.camera.distanceToSquared(this.camera.position)<move)visible=cache.visible;
-      else{
-        const body=this.world(point,this.physical?1.1*this.unitsPerMetre:2.5),distance=this.camera.position.distanceTo(body);
-        const ray=new THREE.Raycaster(this.camera.position,body.clone().sub(this.camera.position).normalize(),0,Math.max(0,distance-.35));
-        visible=ray.intersectObjects([this.scenery,this.ground,...this.terrainPatches,...(this.geology?[this.geology]:[]),...(this.mission.state.rover.occupied?[]:[this.rover])],true).length===0;
-        this.occlusionCache={x:point.x,y:point.y,at:now,camera:this.camera.position.clone(),visible};
-      }
+      const body=this.world(point,this.physical?1.1*this.unitsPerMetre:2.5),distance=this.camera.position.distanceTo(body);
+      const ray=new THREE.Raycaster(this.camera.position,body.clone().sub(this.camera.position).normalize(),0,Math.max(0,distance-.35));
+      visible=ray.intersectObjects([this.scenery,this.ground,...this.terrainPatches,...(this.geology?[this.geology]:[]),...(this.mission.state.rover.occupied?[]:[this.rover])],true).length===0;
     }
     let px=(position.x+1)*this.width/2,py=(1-position.y)*this.height/2;
     const delta={x:point.x-this.mission.state.player.x,y:point.y-this.mission.state.player.y},basis=this.mission.screenBasis||{right:this.inputVector(1,0),down:this.inputVector(0,1)};
@@ -376,8 +360,7 @@ export class Renderer {
     this.marker.scale.setScalar((this.physical?.5*this.unitsPerMetre:1)*(this.reducedMotion?1:1+Math.sin(time*2)*.12));
     for(const site of this.surveys)site.visible=!s.scans.includes(site.userData.site.id);
     this.satellite.visible=false;
-    this.updateTrainingModels(dt,time);this.crew?.update(dt,time);
-    const garden=this.models.get('greenhouse'),o=s.expedition?.outpost;if(garden&&o){garden.userData.growLight.intensity=o.foodKw>1?4+o.foodKw*2:1;for(const p of garden.userData.plants)p.scale.setScalar(.65+Math.min(1,(o.growthHours||0)/(this.mission.rules?.cropCycleHours||6))*.7);}
+    this.updateTrainingModels(dt,time);
   }
   updateTrainingModels(dt,time){
     const s=this.mission.state,id=this.mission.lesson?.id,d=s.training?.drill;
@@ -459,7 +442,7 @@ export class Renderer {
       this.lastDust=this.frameTime;const m=mesh(this.fxGroup,new THREE.IcosahedronGeometry(this.physical?.018*this.unitsPerMetre:.13,0),this.mat.rock,this.world(s.player,this.physical?.04*this.unitsPerMetre:.18).toArray());m.castShadow=false;
       this.particles.push({mesh:m,v:new V(Math.sin(this.stepPhase)*.35,.5,-.15).multiplyScalar(this.unitsPerMetre),age:0,life:.55});
     }
-    for(const p of [...this.particles]){p.age+=dt;p.v.y-=dt*(this.mission.config.physics.surfaceGravityMetresPerSecondSquared||1.62)*this.unitsPerMetre;p.mesh.position.addScaledVector(p.v,dt);p.mesh.scale.setScalar(Math.max(.03,1-p.age/p.life));if(p.age>=p.life){this.fxGroup.remove(p.mesh);p.mesh.geometry.dispose();this.particles.splice(this.particles.indexOf(p),1);}}
+    for(let i=this.particles.length-1;i>=0;i--){const p=this.particles[i];p.age+=dt;p.v.y-=dt*(this.mission.config.physics.surfaceGravityMetresPerSecondSquared||1.62)*this.unitsPerMetre;p.mesh.position.addScaledVector(p.v,dt);p.mesh.scale.setScalar(Math.max(.03,1-p.age/p.life));if(p.age>=p.life){this.fxGroup.remove(p.mesh);p.mesh.geometry.dispose();this.particles.splice(i,1);}}
   }
   drawMini(canvas,life) {this.maps.assistedRoute=this.assistedRoute;this.maps.drawMini(canvas,life);}
   draw(time=0,life=null) {
@@ -474,7 +457,9 @@ export class Renderer {
         this.suitLamp.target.position.copy(this.suitLamp.position).addScaledVector(direction,12*this.unitsPerMetre);
       }
     }
-    this.scene.updateMatrixWorld(true);this.device.render(this.scene,this.camera);
+    // WebGLRenderer updates the scene matrices before drawing. Forcing a full
+    // traversal here made every visible frame walk the scene graph twice.
+    this.device.render(this.scene,this.camera);
   }
   cinematicFrame(elapsed,shot) {
     this.sun.intensity=4.1;this.skySunDirection=null;
@@ -515,7 +500,7 @@ export class Renderer {
     offset.multiplyScalar(Math.max(1,1.1/this.camera.aspect));
     this.camera.fov=46;this.camera.setViewOffset(this.width,this.height,-this.width*.10,this.height*.09,this.width,this.height);
     this.device.toneMappingExposure=1.1;this.focus.copy(target);this.camera.position.copy(target).add(offset);this.keepCameraAboveGround();this.updateSun();
-    this.scene.updateMatrixWorld(true);this.device.render(this.scene,this.camera);
+    this.device.render(this.scene,this.camera);
   }
   updateCinematicDust(time,forward){
     const right=new V(forward.z,0,-forward.x);

@@ -1,11 +1,8 @@
 import { clamp } from './engine.js';
 import { TrainingMission } from './academy.js';
 import { Renderer } from './render-3d.js';
-import { PuzzleTimer, puzzleTimeLimit, PUZZLE_TIME_SECONDS, EXTENSION_SECONDS, EXTENSION_OXYGEN_PERCENT, MAX_EXTENSIONS } from './puzzle-timer.js';
-import { buildRecapQuiz, scoreRecap, reshuffleQuestion } from './recap-quiz.js';
-import { chooseWeather, stageWeather } from './weather.js';
 import { AcademyGuide } from './academy-guide.js';
-import { MissionAudio } from './mission-audio.js';
+import { Soundtrack } from './audio.js';
 import { readPreference, writePreference } from './preferences.js';
 import { MovablePanel } from './panels.js';
 import { resolveRouteRequest, planSurfaceRoute } from './navigation.js';
@@ -17,28 +14,9 @@ import { powerBalance } from './expedition.js';
 import { createDestinationMission } from './worlds.js';
 import { loadGameData, connectLocalBackend } from './local-backend.js';
 
-// Game code version. index.html carries the same value in <meta name="luna-build">; if they differ, the
-// browser is running a stale build next to newer files, which is reported on screen.
-const LUNA_VERSION='1.3.3';
-// Problems are shown on screen (and in the console) instead of silently breaking buttons.
-const reportedProblems=new Set();
-function reportProblem(message){
-  if(reportedProblems.has(message)||!globalThis.document?.body)return;reportedProblems.add(message);console.error('LUNA: '+message);
-  try{showProblem(message);}catch{} // the reporter itself must never throw
-}
-function showProblem(message){
-  let box=document.getElementById('luna-problem');
-  if(!box){box=document.createElement('div');box.id='luna-problem';box.setAttribute('role','alert');Object.assign(box.style,{position:'fixed',left:'50%',bottom:'18px',transform:'translateX(-50%)',zIndex:2147483001,maxWidth:'min(640px,92vw)',padding:'12px 44px 12px 16px',borderRadius:'12px',border:'1px solid #ff6b5e',background:'#2a1012f2',color:'#ffe9e6',font:'13px/1.45 system-ui,sans-serif',boxShadow:'0 10px 30px #0008'});
-    const close=document.createElement('button');close.textContent='×';close.setAttribute('aria-label','Dismiss');Object.assign(close.style,{position:'absolute',right:'8px',top:'6px',background:'none',border:0,color:'#ffe9e6',fontSize:'20px',cursor:'pointer'});close.addEventListener('click',()=>box.remove());
-    const list=document.createElement('div');list.id='luna-problem-list';box.append(list,close);document.body.append(box);}
-  const line=document.createElement('div');line.textContent='⚠ '+message;document.getElementById('luna-problem-list').append(line);
-}
-// A missing page element (for example an older index.html next to newer game code) must not stop the
-// rest of the game from working: return an inert stand-in and report the problem once.
-const inertElement=new Proxy(function(){},{get:(_,key)=>key==='classList'?{add(){},remove(){},toggle(){},contains(){return false;}}:['style','dataset'].includes(key)?{}:['hidden','open','checked','disabled'].includes(key)?false:['value','textContent','innerHTML'].includes(key)?'':key===Symbol.toPrimitive?()=>'':()=>inertElement,set:()=>true,apply:()=>inertElement});
-const $ = id => document.getElementById(id) || (reportProblem('Page element #'+id+' is missing: the page and the game code do not match. Run npm.cmd run build, then press Ctrl+F5.'),inertElement);
+const $ = id => document.getElementById(id);
 const keys = new Set();
-let localSortieState=null;const performanceFrames=[];
+let localSortieState=null;
 let astro=null,gameMode='training',graphicsQuality='balanced',explorationRenderTime=0;
 let pack, flight, flightRenderer, previousFlightPhase='', surfaceResumeStatus=null, skyHolding=false, mission, renderer, life, tutorial, audio, story, tutorialPanel, astraPanel, storage = null, reducedMotion = false, astraLessonAnswered = false;
 let lastTime = 0, uiElapsed = 0, noticeTimer, bannerTimer, shownTutorialStep = '', previousOccupied = false, highlightedTutorialTarget = null, circuitHintStep = '';
@@ -69,9 +47,8 @@ function syncSettings() {
   $('sound-button').setAttribute('aria-label', audio.muted ? 'Enable soundtrack' : 'Mute soundtrack');
   $('sound-button').title = audio.muted ? 'Enable soundtrack' : 'Mute soundtrack';
   $('sound-button').innerHTML = audio.muted ? '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-4v12l-4-4H3V8Zm11-1 4 6m0-6-4 6"/></svg>' : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-4v12l-4-4H3V8Zm10-2c4 2 4 6 0 8m0-6c2 1 2 3 0 4"/></svg>';
-  $('music-toggle').textContent = audio.settings.musicOn ? 'Background music on' : 'Background music off';
-  $('music-toggle').setAttribute('aria-pressed', String(audio.settings.musicOn));
-  $('effects-toggle').textContent='Sound effects'+(audio.settings.effectsOn?' on':' off');$('effects-toggle').setAttribute('aria-pressed',String(audio.settings.effectsOn));
+  $('music-toggle').textContent = audio.muted ? 'Music and effects off' : 'Music and effects on';
+  $('music-toggle').setAttribute('aria-pressed', String(!audio.muted));
   $('music-volume').value = String(Math.round(audio.volume * 100)); $('music-volume-value').textContent = Math.round(audio.volume * 100) + '%';
   $('motion-button').textContent = reducedMotion ? 'Reduced motion enabled' : 'Full cinematic motion';
   $('motion-button').setAttribute('aria-pressed', String(reducedMotion));
@@ -120,7 +97,7 @@ function syncTutorial() {
 function startExpedition() {
   if(story?.active||flight?.active||dialogOpen())return;
   audio.activate(); mission.start(); renderer.trigger('launch', mission.state.player);
-  cinematic(mission.isExpedition?'OUTPOST MISSION / FOUR CREW':'TRAINING LEVEL ' + (mission.levelIndex+1) + ' / '+mission.academy.levels.length, mission.lesson.title.toUpperCase(), mission.lesson.skill);
+  cinematic('TRAINING LEVEL ' + (mission.levelIndex+1) + ' / '+mission.academy.levels.length, mission.lesson.title.toUpperCase(), mission.lesson.skill);
   audio.cue('launch'); resetCamera(); processEvents(); updateUI(); $('world').focus({ preventScroll: true });
 }
 function tutorialAction() {
@@ -131,7 +108,6 @@ function performAction(command) {
   if(story?.active||flight?.active)return;
   audio.activate();
   if (command === 'start') startExpedition();
-  else if(command==='read-objective')mission.acknowledgeGuide();
   else if (command === 'next') tutorial.next();
   else if (command === 'astra') {
     if (!astraLessonAnswered) setAstraOpen(true, false);
@@ -184,7 +160,6 @@ function setView(mode) {
   updateUI();
 }
 function plotObjective() {
-  if(tutorial?.holdsTime&&mission.isExpedition)mission.acknowledgeGuide();
   if (mission.state.status !== 'playing') return;
   clearAssistedRoute();
   setView('surface');
@@ -270,13 +245,13 @@ function setStoryPresentation(active) {
     });
   }else if(storyChromeState){
     for(const {element,hidden,inert} of storyChromeState){element.hidden=hidden;element.inert=inert;}
-    storyChromeState=null;syncPanelLock(); // the window may have been resized during the story
+    storyChromeState=null;
   }
 }
 function openStory() {
   if(!story.start())return;
   keys.clear();setStoryPresentation(true);
-  openDialog($('story-dialog'));audio.activate();updateStoryCaption(); // Starts at once; music joins when the browser allows it.
+  openDialog($('story-dialog'));updateStoryCaption();
 }
 function updateStoryCaption() {
   const chapter=story.chapter;
@@ -286,130 +261,7 @@ function updateStoryCaption() {
     $('story-speaker').textContent=chapter.speaker;$('story-caption').textContent=chapter.caption;
     $('story-caption-card').classList.remove('story-caption-enter');void $('story-caption-card').offsetWidth;$('story-caption-card').classList.add('story-caption-enter');
   }
-  $('story-sound').textContent = storyMusicPlaying() ? 'Music on · mute' : 'Music off · play';
-}
-// Browsers keep audio suspended until the player clicks, so check that sound is really running.
-function storyMusicPlaying() {
-  return audio.settings.musicOn && !audio.muted && audio.context?.state === 'running';
-}
-// Mid-cruise fault card: diagram state, choice preview and an 8-second repair sequence after the player confirms.
-let flightEventPreview=null;
-const REPAIR_SECONDS=8;
-function syncFlightEvent(p) {
-  const card=$('flight-event'),ev=flight.flightEvent,since=ev.resolved?flight.elapsed-(ev.at??flight.elapsed):0;
-  card.hidden=p!=='transfer'||(ev.resolved&&since>=REPAIR_SECONDS);
-  if(card.hidden)return;
-  $('flight-instruction').hidden=true; // never stack the instruction card behind the decision
-  const state=ev.resolved?ev.choice:flightEventPreview?'preview-'+flightEventPreview:'fault';
-  if(card.dataset.state!==state)card.dataset.state=state;
-  $('flight-event-choices').hidden=ev.resolved;
-  const isolate=ev.choice==='isolate',restored=ev.resolved&&since>=(isolate?1.6:1.5);
-  $('flight-event-eyebrow').textContent=ev.resolved?'ASTRA / REPAIR IN PROGRESS':'ASTRA / MID-CRUISE DECISION';
-  $('flight-event-title').textContent=!ev.resolved?'Auxiliary bus fault':restored?'Auxiliary bus restored':isolate?'Isolating the nonessential circuit…':'Switching to backup power…';
-  $('flight-event-readout').textContent=ev.resolved
-    ?(isolate?'The breaker cuts the faulty auxiliary bus off from the downlink. Main power stays clean; data downlink drops to 50% for the rest of the flight.':'The backup battery takes the auxiliary load while the fault clears. Every circuit stays on; this costs 3% flight fuel and 3 emergency units after landing.')
-    :'Choose a response to the fictional auxiliary-bus fault. Hover or focus a choice to preview it on the circuit.';
-  $('flight-event-status').textContent=!ev.resolved
-    ?(flightEventPreview==='isolate'?'Preview: breaker opens · downlink 50% · no fuel cost':flightEventPreview==='backup'?'Preview: battery feeds the aux bus · −3% fuel':'Fault: auxiliary bus arcing · main bus unstable')
-    :restored?(isolate?'✓ Main bus stable · downlink 50%':'✓ All circuits on · downlink 100% · fuel −3%'):(isolate?(since<.7?'Opening breaker…':'Circuit cut off · stabilising main bus…'):(since<1?'Battery online · taking aux load…':'Fault cleared · stabilising…'));
-  const cutOff=isolate?since>=.8:flightEventPreview==='isolate'&&!ev.resolved;
-  $('bus-aux-state').textContent=!ev.resolved||since<(isolate?.8:1)?'FAULT':restored?'STABLE':isolate?'ISOLATED':'ON BATTERY';
-  $('bus-down-state').textContent=cutOff||(ev.resolved&&isolate)&&since>=.5?'50%':'100%';
-  card.setAttribute('aria-label',$('flight-event-title').textContent);
-}
-// Repair puzzle countdown: 45 s, then up to two +15 s extensions costing 3% suit oxygen each; after that the level
-// restarts. Runs on real time while the repair dialog is open (mission time stays paused). The clock belongs to the
-// puzzle, so closing and reopening the dialog pauses it but does not reset it.
-let puzzleTimer=null,puzzleCircuit=null;
-function puzzleOxygenPercent(){return Math.max(0,mission.state.oxygen/mission.config.suit.oxygenMinutes*100);}
-function extendPuzzleTime(){
-  if(!puzzleTimer?.canExtend||mission.state.status!=='repair')return;
-  puzzleTimer.extend();mission.spendOxygen(EXTENSION_OXYGEN_PERCENT/100*mission.config.suit.oxygenMinutes,'repair overtime');
-  if(mission.state.status==='failed'){$('repair-dialog').close();puzzleTimer=null;processEvents();updateUI();return;}
-  notice('+'+EXTENSION_SECONDS+' s on the repair clock · '+EXTENSION_OXYGEN_PERCENT+'% oxygen used','warning');beep(520,.08);
-  renderCircuit();updatePuzzleTimer(0);
-}
-function restartLevelAfterPuzzle(reason){
-  puzzleTimer=null;puzzleCircuit=null;circuitBoard=null;
-  if($('repair-dialog').open)$('repair-dialog').close();
-  mission.restartLevel();mission.reviewPassed=false;refreshLesson();processEvents();updateUI();
-  notice(reason,'warning');audio.cue?.('fail');
-}
-function updatePuzzleTimer(dt){
-  if(!mission.circuit||mission.state.status!=='repair'){puzzleTimer=null;puzzleCircuit=null;$('puzzle-extend').hidden=true;return;}
-  if(!puzzleTimer||puzzleCircuit!==mission.circuit){puzzleTimer=new PuzzleTimer(puzzleTimeLimit(mission.repairType));puzzleCircuit=mission.circuit;}
-  if(!$('repair-dialog').open)return;
-  const before=puzzleTimer.state,result=puzzleTimer.update(dt,{paused:document.hidden});
-  if(result.type==='out'){restartLevelAfterPuzzle('Out of repair time after both extensions: the level starts again from the beginning.');return;}
-  if(result.type==='expired'&&before==='running'){
-    $('puzzle-timer').dataset.tripped='';setTimeout(()=>{delete $('puzzle-timer').dataset.tripped;},1000);beep(180,.25);renderCircuit();
-    setTimeout(()=>{if($('puzzle-extend').hidden)return;$('puzzle-extend').scrollIntoView?.({block:'nearest',behavior:'smooth'});$('puzzle-extend-button').focus?.({preventScroll:true});},50);
-  }
-  const level=puzzleTimer.level;$('puzzle-timer').dataset.level=level;$('puzzle-time').textContent=puzzleTimer.label();
-  $('puzzle-timer-fill').style.transform='scaleX('+puzzleTimer.fraction.toFixed(4)+')';
-  const left=puzzleTimer.extensionsLeft,waiting=puzzleTimer.state==='expired';
-  $('puzzle-extend').hidden=!waiting;
-  if(waiting){
-    const o2=puzzleOxygenPercent();
-    $('puzzle-extend-text').textContent='Time’s up. Take '+EXTENSION_SECONDS+' more seconds for '+EXTENSION_OXYGEN_PERCENT+'% of your oxygen ('+o2.toFixed(0)+'% → '+Math.max(0,o2-EXTENSION_OXYGEN_PERCENT).toFixed(0)+'%), or restart the level. '+(left===1?'This is your last extension.':left+' extensions left.');
-    $('puzzle-extend-button').textContent='+'+EXTENSION_SECONDS+' s · uses '+EXTENSION_OXYGEN_PERCENT+'% O₂ ('+left+' left)';
-  }
-  $('puzzle-timer-note').textContent=waiting?'The board is locked until you choose.':puzzleTimer.extensions?'Extra time '+puzzleTimer.extensions+' of '+MAX_EXTENSIONS+'. '+(left?'One more extension is possible.':'If this runs out, the level restarts.'):'You have '+PUZZLE_TIME_SECONDS+' seconds. If time runs out you can buy '+EXTENSION_SECONDS+' more seconds for '+EXTENSION_OXYGEN_PERCENT+'% oxygen, twice.';
-  const o2=puzzleOxygenPercent();$('puzzle-oxygen-level').textContent=o2.toFixed(o2<10?1:0)+'%';
-  if(o2<25)$('puzzle-oxygen-level').dataset.low='';else delete $('puzzle-oxygen-level').dataset.low;
-  $('puzzle-extensions').textContent=left?left+' × '+EXTENSION_SECONDS+' s':'none';
-}
-// Weather and ambience: pick the condition for the place the player is in, push it to the renderers,
-// show it on the HUD, and drive the ambient sound. Called from the frame loop (cheap).
-let weatherMode='auto',currentWeather=null,weatherClock=0,lastStrikes=0;
-function weatherPlace(){
-  if(flight?.active){const p=flight.phase;if(['transfer','capture'].includes(p))return 'space';if(['briefing','boarding','cockpit','ignition','ascent'].includes(p))return 'earth';return flight.destination==='mars'?'mars':'moon';} // landing: the destination's weather
-  return mission?.config?.world==='mars'?'mars':'moon';
-}
-function syncWeather(dt=0){
-  const place=weatherPlace(),chip=$('weather-chip');
-  if(!place||story?.active){chip.hidden=true;$('surface-weather').hidden=true;audio.setAmbience?.({},dt);return;}
-  const forced=mission?.isExpedition&&!flight?.active?stageWeather(place,mission.stage?.id):null;
-  const condition=chooseWeather(place,astro?.utc??(mission?.state?.time||0),weatherMode,forced);
-  const target=place==='earth'?flightRenderer?.padWeather:place==='space'?flightRenderer?.spaceWeather:renderer?.weather;
-  target?.setCondition(condition);
-  const severity=condition.radiation?'radiation':condition.id==='storm'?'storm':'normal',surface=(place==='moon'||place==='mars')&&!flight?.active;
-  if(condition!==currentWeather){
-    const first=!currentWeather;currentWeather=condition;
-    $('weather-icon').textContent=$('surface-weather-icon').textContent=condition.icon;$('weather-label').textContent=$('surface-weather-label').textContent=condition.label;$('weather-note').textContent=$('surface-weather-note').textContent=condition.note;
-    chip.dataset.severity=$('surface-weather').dataset.severity=severity;
-    if(!first&&severity!=='normal')notice(condition.label+': '+condition.note,'warning');
-  }
-  // In flight the chip sits at the top of the view; on the surface the weather is a line in the location card.
-  chip.hidden=surface;$('surface-weather').hidden=!surface;
-  if(!surface)placeWeatherChip(dt);
-  const indoors=flight?.active?flight.cabinFlight||['cockpit','ignition'].includes(flight.phase):false;
-  const air=place==='earth'||place==='mars',muffle=indoors?.25:1;
-  audio.setAmbience?.({wind:air?Math.min(1,(condition.wind||0)/20)*(place==='mars'?.55:1)*muffle:0,rain:(condition.rain||0)*muffle,geiger:condition.radiation?1:0},dt);
-  const strikes=flightRenderer?.padWeather?.strikes||0;if(strikes>lastStrikes&&place==='earth')audio.thunder?.(.8);lastStrikes=strikes;
-}
-// In narrow windows the top-centre weather chip would cover the flight title or instruments. Twice a second, check
-// for that and, if so, dock the chip on the left under the flight title and stage strip instead.
-let weatherChipCheck=0;
-function placeWeatherChip(dt){
-  weatherChipCheck-=dt;if(weatherChipCheck>0)return;weatherChipCheck=.5;
-  const chip=$('weather-chip'),field=document.querySelector?.('.playfield')?.getBoundingClientRect?.();
-  if(!field||!document.querySelectorAll||!chip.getBoundingClientRect)return;
-  chip.classList.remove('docked');chip.style.left=chip.style.top='';
-  const visible=e=>e&&e.getClientRects().length>0&&getComputedStyle(e).display!=='none';
-  const blockers=[...document.querySelectorAll('.flight-heading,.flight-instruments')].filter(visible),c=chip.getBoundingClientRect();
-  const covers=blockers.some(e=>{const r=e.getBoundingClientRect();return c.left<r.right&&r.left<c.right&&c.top<r.bottom&&r.top<c.bottom;});
-  if(!covers)return;
-  const above=[...document.querySelectorAll('.flight-heading,.flight-steps')].filter(visible).map(e=>e.getBoundingClientRect());
-  if(!above.length)return;
-  chip.classList.add('docked');
-  chip.style.left=Math.round(Math.min(...above.map(r=>r.left))-field.left)+'px';
-  chip.style.top=Math.round(Math.max(...above.map(r=>r.bottom))-field.top+10)+'px';
-  // On phone-width screens the instruments sit under the title too: step below anything still covered.
-  for(let i=0;i<3;i++){
-    const d=chip.getBoundingClientRect(),hit=blockers.map(e=>e.getBoundingClientRect()).find(r=>d.left<r.right&&r.left<d.right&&d.top<r.bottom&&r.top<d.bottom);
-    if(!hit)break;chip.style.top=Math.round(hit.bottom-field.top+10)+'px';
-  }
+  $('story-sound').textContent=audio.context&&!audio.muted?'Mute music':'Enable music';
 }
 function finishStory(skipped=false) {
   story.finish(skipped);$('story-dialog').close();syncFlight();
@@ -440,7 +292,7 @@ function syncCameraControls() {
 }
 function showTutorial() {
   if(workbenchOpen)closeWorkbench();
-  shownTutorialStep='';tutorial.restart(); shownTutorialStep=''; tutorialPanel?.reset();
+  tutorial.restart(); shownTutorialStep=''; tutorialPanel?.reset();
   if($('settings-dialog').open)$('settings-dialog').close();
   if(['complete','failed'].includes(mission.state.status))showDebrief();
   else { setView('surface'); updateUI(); }
@@ -540,8 +392,6 @@ function closeWorkbench(resume=true){
 function advanceLesson(){
   if(mission.isExpedition){$('debrief-dialog').close();openJourney();return;}
   if(mission.state.status!=='complete')return;
-  // The recap quiz must be passed before the next level: from the workbench or the next-action card, open it.
-  if(mission.awaitingRecap){closeWorkbench(false);showDebrief();return;}
   closeWorkbench(false);$('debrief-dialog').close();
   if(mission.nextLevel())refreshLesson();else{renderLevels();openDialog($('levels-dialog'));}
 }
@@ -563,7 +413,7 @@ function updateUI() {
   const s = mission.state, c = mission.config, geo = mission.terrain.geo(s.player);
   life = mission.lifeline();
   renderLesson(); renderAcademy();renderOutpost();
-  const next=tutorial?.holdsTime?tutorial.step:mission.nextAction(); $('next-action-title').textContent=next.title; $('next-action-text').textContent=next.text; $('next-action-button').textContent=next.action+' →';
+  const next=mission.nextAction(); $('next-action-title').textContent=next.title; $('next-action-text').textContent=next.text; $('next-action-button').textContent=next.action+' →';
   $('next-action-button').disabled=['paused','repair'].includes(s.status)||story?.active===true;
   $('briefing-card').hidden = s.status !== 'ready' || renderer.mode!=='surface' || tutorial.active;
   $('paused-banner').hidden = s.status !== 'paused' || !!dialogOpen() || workbenchOpen;
@@ -620,7 +470,6 @@ function updateUI() {
   syncTutorial();syncFlight();if(astro&&renderer.mode!=='surface')$('world-kicker').textContent='NASA / JPL · '+new Date(astro.utc*1000).toISOString().slice(0,16)+' UTC';if(mission.isExpedition&&renderer.mode==='surface'){$('world-kicker').textContent='OUTPOST MISSION / STAGE '+Math.min(7,s.expedition.stage+1)+' OF 7';$('briefing-kicker').textContent='MISSION BRIEFING';$('start-button').textContent='Begin outpost mission →';}
 }
 function processEvents() {
-  if($('consequence-dialog')?.open)return;
   for (const event of mission.events.splice(0)) {
     if (event.type === 'notice') { notice(event.message, event.kind); if (event.kind === 'success') beep(690, 0.12); }
     if (event.type === 'repair') { renderCircuit(); openDialog($('repair-dialog')); beep(440, 0.12); }
@@ -633,114 +482,43 @@ function processEvents() {
     if (event.type === 'ended') { const success = mission.state.status === 'complete'; renderer.trigger(success ? 'victory' : 'fail', mission.state.player); audio.cue(success ? 'victory' : 'fail'); syncTutorial(); if(workbenchOpen&&success)updateWorkbench();else showDebrief(); }
   }
 }
-// Circuit board. Tiles are built once per puzzle; wires are drawn in their current position, and a click plays a
-// short 45° turn so the player sees which way the tile moved. Right-click or Shift+click turns it back.
-// Works for every board size (3×3 to 5×5).
-let circuitBoard=null,circuitTurned=null;
-const CIRCUIT_ENDS=[[30,0],[60,0],[60,30],[60,60],[30,60],[0,60],[0,30],[0,0]];
-function turnCircuitTile(i,direction){
-  const circuit=mission.circuit;if(!circuit||puzzleTimer?.state!=='running'&&puzzleTimer)return;
-  const was=circuit.powered().has(i);circuit.rotate(i,direction);circuitTurned={index:i,direction};
-  beep(370+(was?90:0)+(direction<0?-40:0),0.035);renderCircuit();
-}
 function renderCircuit() {
   const circuit = mission.circuit;
   if (!circuit) return;
   $('repair-title').innerHTML = mission.repairType === 'outpost' ? 'Reconnect Haven’s power bus<span>.</span>' : mission.repairType === 'relay' ? 'Restore the surface relay<span>.</span>' : 'Reconnect Echo’s power bus<span>.</span>';
   $('repair-description').textContent=circuit.instructions;
   $('circuit-design').textContent=circuit.name;$('circuit-frame').dataset.design=circuit.design;
-  $('circuit-frame').style.setProperty?.('--cols',String(circuit.cols));$('circuit-frame').style.setProperty?.('--rows',String(circuit.rows));
   for(const [id,endpoint] of [['circuit-input',circuit.input],['circuit-output',circuit.output]]){
     const position=circuit.terminalPosition(endpoint);$(id).style.gridRow=String(position.row);$(id).style.gridColumn=String(position.column);
   }
   $('circuit-grid').setAttribute('aria-label',circuit.name+'. '+circuit.instructions);
-  const powered = circuit.powered(), connected = circuit.connected(), grid=$('circuit-grid'), count=circuit.ports.length;
-  if(circuitBoard!==circuit||grid.children.length!==count){
-    circuitBoard=circuit;circuitTurned=null;grid.replaceChildren();
-    for (let i = 0; i < count; i++) {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'circuit-tile';
-      button.innerHTML = '<svg viewBox="0 0 60 60" aria-hidden="true"></svg>';
-      button.addEventListener('click', event => { turnCircuitTile(i,event.shiftKey?-1:1); grid.children[i]?.focus?.({ preventScroll: true }); });
-      button.addEventListener('contextmenu', event => { event.preventDefault(); turnCircuitTile(i,-1); });
-      grid.append(button);
-    }
-  }
-  for (let i = 0; i < count; i++) {
-    const button=grid.children[i];if(!button)continue;
-    button.classList.toggle('powered',powered.has(i));
-    button.setAttribute('aria-label', 'Circuit tile '+circuit.tileName(i)+', turned '+circuit.turns[i]*45+'°'+(powered.has(i)?', powered':'')+'. Click to turn 45° clockwise, right-click to turn back.');
-    const svg=button.querySelector?.('svg');if(!svg)continue;
-    svg.innerHTML=circuit.connections(i).map(port=>`<path d="M30 30 L${CIRCUIT_ENDS[port][0]} ${CIRCUIT_ENDS[port][1]}"/>`).join('')+'<circle cx="30" cy="30" r="4" fill="currentColor" stroke="none"/>';
-    if(circuitTurned?.index===i&&svg.animate&&!reducedMotion)svg.animate([{transform:'rotate('+(circuitTurned.direction<0?45:-45)+'deg)'},{transform:'rotate(0deg)'}],{duration:150,easing:'ease-out'});
+  const powered = circuit.powered(), connected = circuit.connected(), endpoints = [[30, 0], [60, 30], [30, 60], [0, 30]];
+  $('circuit-grid').replaceChildren();
+  for (let i = 0; i < 9; i++) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'circuit-tile' + (powered.has(i) ? ' powered' : '');
+    button.setAttribute('aria-label', 'Rotate circuit tile ' + (i + 1));
+    const paths = circuit.connections(i).map(port => `<path d="M30 30 L${endpoints[port][0]} ${endpoints[port][1]}"/>`).join('');
+    button.innerHTML = `<svg viewBox="0 0 60 60" aria-hidden="true">${paths}<circle cx="30" cy="30" r="4" fill="currentColor" stroke="none"/></svg>`;
+    button.addEventListener('click', () => { circuit.rotate(i); beep(370 + (powered.has(i) ? 90 : 0), 0.035); renderCircuit(); $('circuit-grid').children[i].focus({ preventScroll: true }); });
+    $('circuit-grid').append(button);
   }
   $('circuit-feedback').textContent = connected ? 'Power path connected · ready to apply' : 'Connect input → output';
   $('circuit-feedback').style.color = connected ? '#ccebc0' : '#a6c2a5';
-  circuitTurned=null;$('circuit-moves').textContent = circuit.moves + ' turns';
-  const waiting=!!puzzleTimer&&puzzleTimer.state!=='running';
-  $('circuit-frame').classList.toggle('locked',waiting);
-  $('output-indicator').classList.toggle('connected', connected); $('apply-repair').disabled = !connected||waiting;
-}
-// Mission recap quiz: four questions on what just happened in this run. After a completed flight-school level it is
-// mandatory: at least 2 of 4 correct earns the badge and unlocks the next level. A wrong answer shows a hint and
-// gives one more try with the options in a new order. Every time the quiz is built the options are shuffled again.
-let currentRecap=null; // the quiz on screen (questions in their current option order), for tests and debugging
-function recapGates(d){return !!d.success&&!mission.isExpedition&&typeof mission.passRecap==='function';}
-function renderRecapQuiz(d){
-  const quiz=buildRecapQuiz(mission,d,{seed:Math.floor(Math.random()*2147483646)+1,scenarios:pack?.scenarios}),results=[],gate=recapGates(d);
-  const passMark=quiz.passMark||2,tries=quiz.tries||2;currentRecap={quiz,live:[...quiz.questions],results};
-  $('recap-quiz').hidden=!quiz.questions.length;$('recap-title').textContent=quiz.title;$('recap-score').textContent='';$('recap-retry').hidden=true;
-  $('recap-intro').textContent=gate?'Answer at least '+passMark+' of '+quiz.questions.length+' correctly to earn your badge and continue. A wrong answer gives you a hint and one more try.':'Quick check on what just happened. A wrong answer gives you a hint and one more try.';
-  const finish=()=>{
-    const n=results.filter(Boolean).length,total=quiz.questions.length,passed=n>=passMark;
-    $('recap-score').textContent='Recap score: '+n+' / '+total+(passed?(n===total?' · you know exactly what happened out there.':' · passed.'):' · you need '+passMark+' correct to continue. Read the journal below, then try a new quiz.');
-    $('recap-score').dataset.result=passed?'pass':'fail';
-    if(!passed){$('recap-retry').hidden=false;audio.cue('fail');return;}
-    if(gate&&mission.awaitingRecap){mission.passRecap();audio.cue('victory');updateDebriefAfterRecap(d);syncAdvancement();updateUI();}
-  };
-  $('recap-questions').replaceChildren(...quiz.questions.map((original,qi)=>{
-    let q=original,attempt=0;
-    const item=document.createElement('li'),prompt=document.createElement('p'),options=document.createElement('div'),hint=document.createElement('p'),explain=document.createElement('p');
-    prompt.textContent=q.prompt;options.className='recap-options';hint.className='recap-hint';hint.hidden=true;explain.className='recap-explain';explain.hidden=true;
-    const wrongTexts=new Set();
-    const draw=()=>options.replaceChildren(...q.options.map((text,oi)=>{
-      const b=document.createElement('button');b.className='recap-option';b.type='button';b.textContent=text;
-      if(wrongTexts.has(text)){b.disabled=true;b.dataset.result='wrong';}
-      b.addEventListener('click',()=>{
-        if(results[qi]!==undefined||b.disabled)return;attempt++;
-        if(oi===q.answer){
-          results[qi]=true;for(const o of options.children){o.disabled=true;}b.dataset.result='correct';
-          explain.textContent=(attempt===1?'✓ Correct. ':'✓ Correct on the second try. ')+q.explain;explain.hidden=false;hint.hidden=true;audio.cue('ready');
-        }else if(attempt<tries){
-          wrongTexts.add(text);q=reshuffleQuestion(q);currentRecap.live[qi]=q;draw();
-          hint.textContent='Not quite. Hint: '+q.hint+' Try once more.';hint.hidden=false;audio.cue('fail');
-          options.querySelector?.('button:not(:disabled)')?.focus?.({preventScroll:true});
-        }else{
-          results[qi]=false;for(const [k,o] of [...options.children].entries()){o.disabled=true;if(k===q.answer)o.dataset.result='correct';}b.dataset.result='wrong';
-          hint.hidden=true;explain.textContent='The answer was “'+q.options[q.answer]+'”. '+q.explain;explain.hidden=false;audio.cue('fail');
-        }
-        if(results.filter(r=>r!==undefined).length===quiz.questions.length)finish();
-      });return b;}));
-    draw();item.append(prompt,options,hint,explain);return item;
-  }));
-}
-function updateDebriefAfterRecap(d){
-  $('debrief-title').textContent='Level complete. Badge earned.';$('debrief-rank').textContent=mission.rank;
-  $('debrief-description').textContent=mission.lesson.badge+' earned by completing '+mission.lesson.title+'. '+(mission.courseComplete?'Your training course is complete.':'The next level is unlocked. Continue below, or try the optional 100 XP question.');
-  $('skill-check').hidden=!d.success;
+  $('circuit-moves').textContent = circuit.moves + ' rotations';
+  $('output-indicator').classList.toggle('connected', connected); $('apply-repair').disabled = !connected;
 }
 function showDebrief() {
   if(mission.isExpedition){showExpeditionDebrief();return;}
   const d = mission.debrief();
   $('debrief-dialog').dataset.success = String(d.success);
-  const awaiting=d.success&&mission.awaitingRecap;
-  $('debrief-title').textContent = awaiting ? 'Field tasks complete. One last step.' : d.success ? 'Level complete. Badge earned.' : 'Every explorer learns.';
-  $('debrief-description').textContent = awaiting ? 'Pass the mission recap quiz below (at least 2 of 4 correct) to earn '+mission.lesson.badge+(mission.levelIndex<mission.academy.levels.length-1?' and unlock level '+(mission.levelIndex+2):'')+'.' : d.success ? mission.lesson.badge+' earned by completing '+mission.lesson.title+'. '+(mission.courseComplete?'Your training course is complete.':'The next level is unlocked. Continue below, or try the optional 100 XP question.') : d.failureReason+'. Retry this lesson with a safer route. Previously earned badges are kept.';
+  $('debrief-title').textContent = d.success ? 'Level complete. Badge earned.' : 'Every explorer learns.';
+  $('debrief-description').textContent = d.success ? mission.lesson.badge+' earned by completing '+mission.lesson.title+'. '+(mission.courseComplete?'Your training course is complete.':'The next level is unlocked. Continue below, or try the optional 100 XP question.') : d.failureReason+'. Retry this lesson with a safer route. Previously earned badges are kept.';
   $('debrief-emblem').textContent = d.success ? '✦' : '↻'; $('debrief-rank').textContent = d.success?mission.rank:mission.lesson.skill;
   const metrics = [[d.timeMinutes.toFixed(1), 'MISSION MINUTES'], [d.distanceKm.toFixed(2) + ' km', 'DISTANCE TRAVELLED'], [mission.science.length?d.scans+' / '+mission.science.length:'—', 'TERRAIN OBSERVATIONS'], [d.oxygenPercent.toFixed(0) + '%', 'OXYGEN RETURNED'], [String(d.repairs), 'SYSTEMS RESTORED'], [String(d.success?d.score:0), 'LESSON POINTS']];
   $('debrief-metrics').replaceChildren();
   for (const [value, label] of metrics) { const div = document.createElement('div'), strong = document.createElement('strong'), span = document.createElement('span'); strong.textContent = value; span.textContent = label; div.append(strong, span); $('debrief-metrics').append(div); }
   $('debrief-learning').textContent = d.success ? 'Skill demonstrated: '+mission.lesson.skill+'. '+mission.lesson.explanation : 'Longer routes, waiting in the field, and sprinting affect your reserves. Go to objective follows a calculated terrain route. Watch the Lifeline before taking a detour.';
-  $('skill-check').hidden=!d.success||!!mission.awaitingRecap;
+  $('skill-check').hidden=!d.success;
   $('review-question').textContent=mission.lesson.question;
   $('review-feedback').textContent=mission.reviewPassed?'✓ '+mission.lesson.badge+' earned. '+mission.lesson.explanation:'';
   $('review-answers').replaceChildren(...mission.lesson.answers.map((answer,i)=>{
@@ -751,14 +529,14 @@ function showDebrief() {
       if(result.correct){audio.cue('victory');for(const b of $('review-answers').children)b.disabled=true;$('debrief-title').textContent='Badge earned.';$('debrief-rank').textContent=mission.rank;syncAdvancement();updateUI();}
     });return button;
   }));
-  syncAdvancement();renderRecapQuiz(d);
+  syncAdvancement();
   $('debrief-journal').replaceChildren();
   for (const entry of d.journal.filter(e => e.type !== 'briefing').slice(-10)) { const div = document.createElement('div'), time = document.createElement('time'), span = document.createElement('span'); time.textContent = (entry.time / 60).toFixed(1) + 'm'; span.textContent = entry.message; div.append(time, span); $('debrief-journal').append(div); }
   try { const best = Number(storage?.getItem('luna-best') || 0); if (d.success && d.score > best) storage?.setItem('luna-best', String(d.score)); } catch { /* Storage may be disabled; play still works. */ }
   openDialog($('debrief-dialog'));
 }
 function syncAdvancement() {
-  $('next-level-button').hidden=mission.state.status!=='complete'||!!mission.awaitingRecap;
+  $('next-level-button').hidden=mission.state.status!=='complete';
   $('next-level-button').textContent=mission.levelIndex===mission.academy.levels.length-1?'View training record →':'Start level '+(mission.levelIndex+2)+' →';
   $('course-certificate').hidden=!mission.courseComplete;
   $('course-certificate').textContent=mission.courseComplete?'QUALIFIED JUNIOR ASTRONAUT · '+mission.xp+' XP · All '+mission.academy.levels.length+' practical skills completed: '+mission.academy.levels.map(l=>l.badge).join(' · '):'';
@@ -820,13 +598,13 @@ function syncFlight(){
   const departureStamp=astro?new Date(flight.departureUTC*1000).toISOString().slice(0,16).replace('T',' ')+' UTC':flight.plan.epoch.replace('T',' ');
   $('journey-distance-basis').textContent='Centre separation: '+km(flight.plan.separationKm)+' km. Departure '+departureStamp+'. Planned route + ascent: '+(flight.plan.durationSeconds/86400).toFixed(flight.localSortie?2:0)+' days.'+(astro&&!flight.localSortie?' Daylight arrival window.':'')+' Earth g 9.80 m/s².';
   for(const w of ['moon','mars'])$('destination-'+w).setAttribute('aria-pressed',String(w===flight.destination));
-  if(astro){for(const mode of ['expedition','training'])$('mode-'+mode).setAttribute('aria-pressed',String(mode===gameMode));$('flight-skip').hidden=!['boarding','ascent','transfer','capture'].includes(p);$('flight-skip').disabled=p==='transfer'&&!flight.flightEvent.resolved;syncFlightEvent(p);$('continue-surface').hidden=surfaceResumeStatus===null&&!savedSelectedMission();$('continue-surface').textContent=surfaceResumeStatus===null?'Resume outpost checkpoint →':'Continue surface mission →';}
+  if(astro){for(const mode of ['expedition','training'])$('mode-'+mode).setAttribute('aria-pressed',String(mode===gameMode));$('flight-skip').hidden=!['boarding','ascent','transfer','capture'].includes(p);$('flight-skip').disabled=p==='transfer'&&!flight.flightEvent.resolved;$('flight-event').hidden=p!=='transfer'||flight.flightEvent.resolved;$('flight-event-readout').textContent='Choose a response to the fictional auxiliary-bus fault. Isolating the nonessential circuit reduces flight downlink to 50%; backup power uses 3% flight fuel and 3 emergency units after landing.';$('continue-surface').hidden=surfaceResumeStatus===null&&!savedSelectedMission();$('continue-surface').textContent=surfaceResumeStatus===null?'Resume outpost checkpoint →':'Continue surface mission →';}
   const copy={briefing:['Choose your destination.','Earth launch site · drag to orbit through 360°','Select Moon or Mars.','Then board Odyssey. Your destination and calculated distance are loaded into the cockpit.'],boarding:['Welcome aboard Odyssey.','Earth → '+name+' · access gantry · drag to look around','The cadet is boarding.','Watch the astronaut enter the command capsule. Systems check automatically, then you press the physical LAUNCH switch.'],cockpit:['You have the controls.','Earth → '+name+' · cabin secure · navigation loaded','Press the amber LAUNCH switch.','Click the physical switch on the console, press E, or use the button below. The cadet reaches forward to activate it. Drag to look around the cockpit.'],ignition:['Ignition sequence.','Earth → '+name+' · restraints locked','Launch switch engaged.','The engine starts after the astronaut presses the button. Keep an eye on cabin pressure and ascent velocity.'],ascent:['Leaving Earth.','Earth → '+name+' · powered ascent','Odyssey is climbing.','Velocity, acceleration, outside pressure and local gravity follow the ascent model. The animation advances automatically.'],transfer:['Destination: '+name+'.','Earth → '+name+' · transfer cruise','The journey is underway.','Coasting in space. The simulated mission clock runs faster here. Cabin temperature stays controlled while hull temperature follows the teaching model.'],capture:['Prepare for landing.','Arrival at '+name+' · g '+WORLDS[flight.destination].gravity+' m/s²','Two controls are coming up.','First lock descent velocity in the green 1–3 m/s zone with Space. Then lock attitude within ±5°. A go-around lets you retry an unsafe solution.'],speed:['Take command of the landing.','Final approach to '+name,'Lock descent velocity.',''],angle:['Set the landing attitude.','Final approach to '+name,'Lock the angle.',''],descent:['Retrorockets engaged.','Controlled descent to '+name,'Landing.',''], 'go-around':['Go-around commanded.','Your crew is safe · try the landing again','Adjust your parameters.',''],landed:['Welcome to '+name+'.','Touchdown confirmed · cabin pressure stable','Your surface training awaits.','Step outside to explore '+(flight.destination==='mars'?'Jezero’s rust-coloured terrain':'Mare Tranquillitatis')+', inspect the sky and '+(gameMode==='expedition'?'operate Haven in seven linked stages':'complete ten practical lessons')+'. Drag for a 360° view; F switches to astronaut vision.']}[p];
   if(flight.localSortie){copy[0]=copy[0].replace('Earth',name);copy[1]=name+' → orbital practice → '+name;copy[3]=copy[3].replace('Earth',name);$('journey-distance').textContent=name+' orbital practice · '+km(t.totalKm)+' km illustrative path';$('journey-distance-basis').textContent='400 km training orbit; period '+(flight.plan.durationSeconds/60).toFixed(1)+' min derived from gravity and radius. '+flight.plan.classification;}if(p==='ignition')copy[2]='Countdown · T−'+Math.max(0,3-Math.floor(flight.elapsed/2.4*3));
   $('flight-title').textContent=copy[0];$('flight-caption').textContent=copy[1];$('flight-action-title').textContent=copy[2];$('flight-action-text').textContent=copy[3];
   const stage=p==='briefing'||p==='boarding'?0:p==='cockpit'||p==='ignition'?1:p==='ascent'||p==='transfer'?2:3;
   ['earth','cockpit','transfer','landing'].forEach((x,i)=>$('stage-'+x).classList.toggle('active',i===stage));
-  const gauges=flight.gauges;$('landing-speed-input').disabled=p!=='speed';$('landing-angle-input').disabled=p!=='angle';$('velocity-arrow').style.bottom=gauges.speed/12*100+'%';$('angle-arrow').style.left=(gauges.angle+15)/30*100+'%';
+  const gauges=flight.gauges;$('velocity-arrow').style.bottom=gauges.speed/12*100+'%';$('angle-arrow').style.left=(gauges.angle+15)/30*100+'%';
   $('landing-velocity').textContent=gauges.speed.toFixed(1)+' m/s'+(flight.speedLocked!==null?' ✓':'');$('landing-angle').textContent=gauges.angle.toFixed(1)+'°'+(flight.angleLocked!==null?' ✓':'');
   $('velocity-scale').setAttribute('aria-valuenow',gauges.speed.toFixed(1));$('angle-scale').setAttribute('aria-valuenow',gauges.angle.toFixed(1));
   $('landing-step').textContent=p==='speed'?'1 / 2 · LOCK VELOCITY':p==='angle'?'2 / 2 · LOCK ANGLE':p==='descent'?'BOTH PARAMETERS LOCKED':'AUTOMATIC GO-AROUND';
@@ -872,18 +650,9 @@ function setMissionPanel(view){
   $('panel-mission').setAttribute('aria-pressed',String(!systems));
   $('panel-systems').setAttribute('aria-pressed',String(systems));
 }
-// The Mission panel is locked (inert) only while the story plays or while it is a closed drawer in a narrow window.
-// It is worked out from the current state every time, never restored from a saved value, so resizing the window
-// at any moment (also during the story) can never leave a visible panel that ignores clicks.
-let drawerQuery=null,drawerOpen=false;
-function syncPanelLock(){
-  const panel=$('mission-panel');
-  panel.inert=!!storyChromeState||(!!drawerQuery?.matches&&!drawerOpen);
-}
 function setupViewportControls(){
-  const narrow=drawerQuery=window.matchMedia('(max-width:840px)');
-  const setDrawer=open=>{drawerOpen=!!open;document.body.classList.toggle('hud-open',drawerOpen);$('hud-button').setAttribute('aria-expanded',String(drawerOpen));syncPanelLock();};
-  window.addEventListener('resize',syncPanelLock);
+  const narrow=window.matchMedia('(max-width:840px)');
+  const setDrawer=open=>{document.body.classList.toggle('hud-open',open);$('hud-button').setAttribute('aria-expanded',String(open));$('mission-panel').inert=!!narrow.matches&&!open;};
   $('hud-button').addEventListener('click',()=>setDrawer($('hud-button').getAttribute('aria-expanded')!=='true'));
   $('hud-close').addEventListener('click',()=>{setDrawer(false);$('hud-button').focus();});
   narrow.addEventListener?.('change',()=>setDrawer(false));setDrawer(false);
@@ -923,25 +692,15 @@ function setupEvents() {
   $('tilt-down').addEventListener('click',()=>renderer.rotateCamera?.(0,-.15));
   $('inspect-objective').addEventListener('click',()=>{renderer.showObjective?.();updateUI();notice(renderer.perspective==='first-person'?'Helmet facing the objective. Follow the gold marker; nearby structures and terrain can block the view.':'Objective framed. Drag to inspect it from every side; Follow astronaut returns to your position.');});
   $('camera-home').addEventListener('click',resetCamera);
-  $('story-sound').addEventListener('click', async () => {
-    const enableMusic = !storyMusicPlaying();
-    audio.setOption('musicOn', enableMusic);
-    if (enableMusic) audio.setMuted(false);
-    await audio.activate(); // This click is the gesture browsers require before sound can play.
-    updateStoryCaption();
-    syncSettings();
-  });
-  $('story-replay').addEventListener('click',()=>{$('settings-dialog').close();story.state='idle';const enabled=story.enabled;story.enabled=true;openStory();story.enabled=enabled;});
-  $('story-skip').addEventListener('click',()=>{audio.activate();finishStory(true);});
+  $('story-sound').addEventListener('click',()=>{audio.setMuted(audio.context?!audio.muted:false);audio.activate();updateStoryCaption();syncSettings();});
+  $('story-skip').addEventListener('click',()=>finishStory(true));
   $('story-dialog').addEventListener('cancel',event=>{event.preventDefault();finishStory(true);});
   $('story-dialog').addEventListener('close',()=>{story.finish(true);setStoryPresentation(false);renderer.endCinematic?.();audio.setHidden(document.hidden);keys.clear();lastTime=0;});
   $('astra-follow-route').addEventListener('click',followAssistedRoute);
   $('astra-clear-route').addEventListener('click',()=>{clearAssistedRoute();askAstra('next');astraPanel.refresh();});
   $('astra-pick-point').addEventListener('click',()=>{selectingRoutePoint=!selectingRoutePoint;setView('surface');if(selectingRoutePoint){mission.route=null;setAstraOpen(false,false);notice('ASTRA: tap a point on the terrain or surface tracker. Escape cancels selection.');$('world').focus({preventScroll:true});}});
-  // The flight-school card stays inside the 3D view, so it never slides under the Mission panel in mid-size windows.
-  tutorialPanel = new MovablePanel({ panel: $('tutorial-card'), handle: $('tutorial-drag-handle'), resetButton: $('tutorial-position-reset'), storage, storageKey: 'luna-tutorial-position-v2', view: window, onGrab: () => keys.clear(),
-    bounds: () => $('tutorial-card').classList?.contains?.('in-dialog') ? null : document.querySelector?.('.playfield')?.getBoundingClientRect?.(), boundsElement: document.querySelector?.('.playfield') });
-  astraPanel = new MovablePanel({ panel: $('astra-card'), handle: $('astra-drag-handle'), resetButton: $('astra-position-reset'), storage, storageKey: 'luna-astra-position-v1', view: window, onGrab: () => keys.clear(), maxHeight: 620 });
+  tutorialPanel = new MovablePanel({ panel: $('tutorial-card'), handle: $('tutorial-drag-handle'), resetButton: $('tutorial-position-reset'), storage, storageKey: 'luna-tutorial-position-v2', view: window, onGrab: () => keys.clear() });
+  astraPanel = new MovablePanel({ panel: $('astra-card'), handle: $('astra-drag-handle'), resetButton: $('astra-position-reset'), storage, storageKey: 'luna-astra-position-v1', view: window, onGrab: () => keys.clear() });
   $('astra-button').disabled = false;
   $('astra-button').addEventListener('click', () => { audio.activate(); setAstraOpen($('astra-card').hidden); syncTutorial(); });
   $('astra-close').addEventListener('click', () => { setAstraOpen(false); syncTutorial(); });
@@ -958,7 +717,7 @@ function setupEvents() {
   $('reset-camera').addEventListener('click',()=>{resetCamera();$('settings-dialog').close();setView('surface');notice('Camera reset. Follow the gold objective marker or use Go to objective.');});
   $('reset-panels').addEventListener('click',()=>{tutorialPanel.reset();astraPanel.reset();notice('Tutorial and ASTRA positions reset.');});
   $('levels-button').addEventListener('click',()=>{renderLevels();openDialog($('levels-dialog'));});
-  $('next-action-button').addEventListener('click',()=>performAction(tutorial.active&&mission.isExpedition?tutorial.step.command:mission.nextAction().command));
+  $('next-action-button').addEventListener('click',()=>performAction(mission.nextAction().command));
   $('return-surface').addEventListener('click',()=>setView('surface'));
   $('inspect-earth').addEventListener('click',()=>inspectBody('Earth'));
   $('inspect-lro').addEventListener('click',()=>inspectBody(mission.config.astronomyTrainingTargets?.[1]||'LRO'));
@@ -981,18 +740,14 @@ function setupEvents() {
   const pause = () => { audio.activate(); if(workbenchOpen){closeWorkbench();updateUI();return;}if (['complete', 'failed'].includes(mission.state.status)) showDebrief(); else { mission.pause(); keys.clear(); updateUI(); } };
   $('pause-button').addEventListener('click', pause); $('resume-button').addEventListener('click', pause);
   const toggleMusic = () => { audio.setMuted(!audio.muted); audio.activate(); syncSettings(); };
-  $('sound-button').addEventListener('click',toggleMusic);
-  for(const [id,key] of [['music-toggle','musicOn'],['effects-toggle','effectsOn']])$(id).addEventListener('click',()=>{audio.setOption(key,!audio.settings[key]);audio.activate();syncSettings();});
+  $('sound-button').addEventListener('click', toggleMusic); $('music-toggle').addEventListener('click', toggleMusic);
   $('music-volume').addEventListener('input', () => { audio.setVolume(Number($('music-volume').value) / 100); audio.activate(); syncSettings(); });
   $('motion-button').addEventListener('click', () => { reducedMotion = !reducedMotion; writePreference('luna-motion-v1', reducedMotion, storage); renderer.clearEffects(); syncSettings(); });
   $('opening-toggle').addEventListener('click',()=>{story.setEnabled(!story.enabled);syncSettings();});
-  $('puzzle-extend-button').addEventListener('click',extendPuzzleTime);
-  $('puzzle-restart-button').addEventListener('click',()=>restartLevelAfterPuzzle('Level restarted from the beginning.'));
-  $('recap-retry').addEventListener('click',()=>{renderRecapQuiz(mission.debrief());$('recap-questions').querySelector?.('button')?.focus?.({preventScroll:true});});
   $('apply-repair').addEventListener('click', () => {
     if (mission.completeRepair()) { $('repair-dialog').close(); processEvents(); updateUI(); }
   });
-  $('replay-button').addEventListener('click',()=>{$('debrief-dialog').close();mission.replayCheckpoint();mission.reviewPassed=false;mission.recapPassed=false;refreshLesson();processEvents();updateUI();});
+  $('replay-button').addEventListener('click',()=>{$('debrief-dialog').close();mission.replayCheckpoint();mission.reviewPassed=false;refreshLesson();processEvents();updateUI();});
   $('restart-button').addEventListener('click',()=>{$('debrief-dialog').close();mission.reset();refreshLesson();});
   $('next-level-button').addEventListener('click',advanceLesson);
   document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
@@ -1076,38 +831,22 @@ function setupEvents() {
   new ResizeObserver(resize).observe($('world')); resize();
   if (window.LUNA_DATA) $('download-button').hidden = true;
 }
-// Performance: never draw faster than about 60 fps (high-refresh screens would otherwise double the work and heat),
-// and lower the drawing resolution in 10% steps (down to 70%) while frames stay slow, raising it again when there is headroom.
-const FRAME_MIN_MS=1000/60-3;
-let adaptSeconds=0,readoutSeconds=0;
-function adaptRenderScale(frameMs){
-  if(!renderer?.device||document.hidden||frameMs<=0)return;
-  adaptSeconds+=Math.min(frameMs,1000)/1000;if(adaptSeconds<3||performanceFrames.length<20)return;adaptSeconds=0;
-  const average=performanceFrames.reduce((a,b)=>a+b,0)/performanceFrames.length,current=Renderer.renderScale||1;
-  const next=average>26&&current>.7?Math.max(.7,Math.round((current-.1)*10)/10):average<18.5&&current<1?Math.min(1,Math.round((current+.1)*10)/10):current;
-  if(next===current)return;
-  Renderer.renderScale=next;performanceFrames.length=0;const rect=$('world').getBoundingClientRect();renderer.resize(rect.width,rect.height,Math.min(window.devicePixelRatio||1,renderer.maxDpr||1.5));
-}
 function animate(now) {
-  try{animateFrame(now);}catch(error){reportProblem('Game error: '+(error?.message||error)+'. The game keeps running; press F12 → Console for details.');console.error(error);requestAnimationFrame(animate);}
-}
-function animateFrame(now) {
-  if(lastTime&&now-lastTime<FRAME_MIN_MS){requestAnimationFrame(animate);return;}
-  const frameMs=lastTime?now-lastTime:0;const dt=lastTime?Math.min(frameMs/1000,.1):0;lastTime=now;if(frameMs>0&&!document.hidden){performanceFrames.push(frameMs);if(performanceFrames.length>120)performanceFrames.shift();adaptRenderScale(frameMs);readoutSeconds+=frameMs/1000;if(readoutSeconds>=.5&&$('performance-readout')){readoutSeconds=0;$('performance-readout').textContent='Observed '+(1000/(performanceFrames.reduce((a,b)=>a+b,0)/performanceFrames.length)).toFixed(1)+' FPS · '+graphicsQuality+' · '+(renderer.device?.info?.render?.triangles||0).toLocaleString()+' triangles · '+Math.round((Renderer.renderScale||1)*100)+'% resolution';}}
+  const dt = lastTime ? Math.min((now - lastTime) / 1000, 0.1) : 0; lastTime = now;
   if(story.active){
-    const ended=story.update(Math.min(frameMs/1000,.5),document.hidden); /* Reading time follows the wall clock, even on slow GPUs. */updateStoryCaption();renderer.cinematicFrame?.(story.elapsed,story.chapter.shot);
+    const ended=story.update(dt,document.hidden);updateStoryCaption();renderer.cinematicFrame?.(story.elapsed,story.chapter.shot);
     $('story-cut').style.opacity=String(renderer.cinematicFade||0);audio.updateOpening(story.elapsed);
     if(ended)finishStory();requestAnimationFrame(animate);return;
   }
-  if(flight?.active){const held=document.hidden||!!dialogOpen();flight.update(dt,held);syncFlight();syncWeather(dt);flightRenderer.draw();audio.updateFlight?.(flight,held);requestAnimationFrame(animate);return;}
-  if(astro?.mode==='exploration'&&!document.hidden){astro.advance(dt);explorationRenderTime+=dt;if(explorationRenderTime>.5&&skyHolding){renderScientificSky();explorationRenderTime=0;}}
+  if(flight?.active){const held=document.hidden||!!dialogOpen();flight.update(dt,held);syncFlight();flightRenderer.draw();if(!held)audio.updateFlight?.(flight);requestAnimationFrame(animate);return;}
+  if(astro?.mode==='exploration'){astro.advance(dt);explorationRenderTime+=dt;if(explorationRenderTime>.5&&skyHolding){renderScientificSky();explorationRenderTime=0;}}
   const right = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
   const down = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
   const vector=renderer.inputVector?.(right,down)||{dx:right+down,dy:-right+down};
-  if (!document.hidden && !dialogOpen() && $('astra-card').hidden && !skyHolding && !tutorial.holdsTime && renderer.mode==='surface') mission.update(dt, { ...vector, sprint: keys.has('shift'), jump: keys.has(' ') });
+  if (!skyHolding && !tutorial.holdsTime && renderer.mode==='surface') mission.update(dt, { ...vector, sprint: keys.has('shift'), jump: keys.has(' ') });
   else mission.state.moving = false;
   if(astro?.mode==='mission')astro.setMissionUTC(mission.utcStart+mission.state.time);
-  updatePuzzleTimer(frameMs>0?Math.min(frameMs/1000,.25):0);syncWeather(dt);processEvents(); uiElapsed += dt;
+  processEvents(); uiElapsed += dt;
   if (uiElapsed >= 0.25) { updateUI(); uiElapsed = 0; }
   audio.update(mission.state, life, tutorial.holdsTime); if(!$('story-dialog').open){if(renderer.mode==='solar')flightRenderer.drawSolarSystem();else renderer.draw(now / 1000, life);updateWayfinding();} requestAnimationFrame(animate);
 }
@@ -1115,49 +854,23 @@ function resourceRows(o){return [[o.oxygen.toFixed(1)+' crew·h','O₂ inventory
 function fillResourceGrid(node,o){node.replaceChildren(...resourceRows(o).map(([value,label])=>{const cell=document.createElement('div'),title=document.createElement('small'),number=document.createElement('strong');title.textContent=label;number.textContent=value;cell.append(title,number);return cell;}));}
 function renderOutpost(){
  const card=$('outpost-card');if(!card)return;card.hidden=!mission.isExpedition;$('envelope-legend').hidden=!mission.isExpedition;if(!mission.isExpedition)return;
- const e=mission.state.expedition,o=e.outpost,p=powerBalance(o,mission.sunlit());fillResourceGrid($('outpost-resources'),o);$('core-power').textContent=o.energy.toFixed(1)+' kWh';$('core-oxygen').textContent=(o.oxygen/mission.rules.crew).toFixed(1)+' crew hours';$('core-health').textContent=o.health.toFixed(0)+'%';renderMessages();$('outpost-phase').textContent=Math.min(7,e.stage+1)+' / 7';
+ const e=mission.state.expedition,o=e.outpost,p=powerBalance(o,mission.sunlit());fillResourceGrid($('outpost-resources'),o);$('outpost-phase').textContent=Math.min(7,e.stage+1)+' / 7';
  $('outpost-power').textContent='Supply '+p.supply.toFixed(2)+' kW / load '+p.demand.toFixed(2)+' kW · '+(p.net>=0?'charging ':'drawing ')+Math.abs(p.net).toFixed(2)+' kW. Shield '+o.shield+'.';
  $('outpost-alert').textContent=mission.safetyEnvelope().reason;$('local-sortie').disabled=!['playing','complete'].includes(mission.state.status)||!mission.near(mission.objects.base)||o.fuel<5;$('local-sortie').textContent='Orbital flight · 5 fuel ↗';$('local-sortie').title='Board Odyssey for '+mission.config.worldName+' orbital practice. Crew consumes resources during the flight.';
 }
 function showDecision(){
  if(!mission.isExpedition)return;openDialog($('decision-dialog'));renderer.showObjective?.();renderDecision();
 }
-let selectedPlan=null;
 function renderDecision(){
- if(!mission.isExpedition)return;const stage=mission.stage,e=mission.state.expedition,task=mission.taskView();
- $('decision-kicker').textContent='STAGE '+(e.stage+1)+' OF 7 · '+mission.config.worldName.toUpperCase();$('decision-title').textContent=stage.title;$('decision-description').textContent=stage.description;
- $('decision-task-instruction').textContent=task.instruction;$('decision-task-action').textContent=task.label+' →';$('decision-task-action').disabled=task.done||stage.task==='circuit';fillResourceGrid($('decision-resources'),e.outpost);
- $('decision-astra').textContent=task.done?'2 · Compare plans below. Previewing is free and does not advance time.':'1 · Perform each equipment step first. Opening this panel alone does not complete the task.';
- $('decision-review').hidden=true;selectedPlan=null;
- $('decision-options').replaceChildren(...stage.options.map(option=>{
-  const box=document.createElement('section'),name=document.createElement('h3'),text=document.createElement('p'),preview=document.createElement('pre'),button=document.createElement('button'),p=mission.preview(option);box.className='decision-option';name.textContent=option.label;text.textContent=option.explanation;
-  preview.textContent=option.minutes+' mission minutes\nPower: '+p.delta.energy.toFixed(1)+' kWh\nOxygen: '+(p.delta.oxygen/mission.rules.crew).toFixed(1)+' crew hours\nCrew condition: '+p.outpost.health.toFixed(0)+'%'+(p.failure?'\nRisk: '+p.failure:'');
-  button.className='primary-button';button.textContent='Review this plan →';button.disabled=!e.taskDone||Object.entries(option.effects).some(([k,v])=>['kits','fuel','water','oxygen','energy'].includes(k)&&typeof v==='number'&&e.outpost[k]+v<0);
-  button.addEventListener('click',()=>{selectedPlan={id:option.id,stage:e.stage,revision:e.revision};$('decision-review').hidden=false;$('decision-forecast').textContent=forecastText(p)+'\n'+option.explanation;$('decision-confirm').textContent='Confirm '+option.label+' · '+option.minutes+' min';$('decision-review').scrollIntoView({block:'nearest'})});box.append(name,text,preview,button);return box;
- }));
+ if(!mission.isExpedition)return;const stage=mission.stage,e=mission.state.expedition,task=mission.taskView();$('decision-kicker').textContent='MISSION '+mission.config.worldName.toUpperCase()+' / '+(e.stage+1)+' OF 7';$('decision-title').textContent=stage.title;$('decision-description').textContent=stage.description;
+ $('decision-task-instruction').textContent=task.instruction;$('decision-task-action').textContent=task.label+' →';$('decision-task-action').disabled=task.done||stage.task==='circuit';fillResourceGrid($('decision-resources'),e.outpost);$('decision-astra').textContent='ASTRA: '+mission.astra(stage.id==='shelter'?'What is our biggest risk?':'Why did power decrease?');
+ $('decision-options').replaceChildren(...stage.options.map(option=>{const box=document.createElement('section'),name=document.createElement('h3'),text=document.createElement('p'),preview=document.createElement('pre'),button=document.createElement('button'),p=mission.preview(option),o=p.outpost;box.className='decision-option';name.textContent=option.label;text.textContent=option.explanation;preview.textContent=option.minutes+' mission min\nAfter action: '+o.energy.toFixed(1)+' kWh · '+o.oxygen.toFixed(1)+' crew·h O₂\n'+o.water.toFixed(1)+' L water · '+o.health.toFixed(0)+'% health\nScience '+o.science+' · kits '+o.kits+' · fuel '+o.fuel.toFixed(1)+(p.failure?'\nRisk: '+p.failure:'');button.className='primary-button';button.textContent='Choose this plan →';button.disabled=!e.taskDone||Object.entries(option.effects).some(([k,v])=>['kits','fuel','water','oxygen','energy'].includes(k)&&typeof v==='number'&&e.outpost[k]+v<0);button.addEventListener('click',()=>{if(mission.choose(option.id)){$('decision-dialog').close();processEvents();updateUI();}});box.append(name,text,preview,button);return box;}));
 }
-function forecastText(p){return '3 · Before → after this action\nHabitat battery: '+p.before.energy.toFixed(1)+' → '+p.outpost.energy.toFixed(1)+' kWh\nOxygen for all four crew: '+(p.before.oxygen/mission.rules.crew).toFixed(2)+' → '+(p.outpost.oxygen/mission.rules.crew).toFixed(2)+' hours\nCrew condition: '+p.before.health.toFixed(1)+' → '+p.outpost.health.toFixed(1)+'%\nFood: '+p.before.food.toFixed(1)+' → '+p.outpost.food.toFixed(1)+' portions\nWater: '+p.before.water.toFixed(1)+' → '+p.outpost.water.toFixed(1)+' L\nSuit reserves after: '+p.suit.oxygen.toFixed(0)+' min oxygen / '+p.suit.energy.toFixed(0)+' Wh / '+p.suit.water.toFixed(2)+' L water\nScience: '+p.before.science+' → '+p.outpost.science+' · Kits: '+p.before.kits+' → '+p.outpost.kits+'\nTime cost: '+p.minutes+' mission minutes'+(p.failure?'\nWarning: '+p.failure:'');}
-function confirmDecision(){
- if(!selectedPlan||selectedPlan.stage!==mission.state.expedition.stage||selectedPlan.revision!==mission.state.expedition.revision){renderDecision();return;}
- const option=mission.stage.options.find(o=>o.id===selectedPlan.id),p=mission.preview(option);
- if(!mission.choose(option.id,selectedPlan.stage))return;
- selectedPlan=null;$('decision-dialog').close();$('consequence-text').textContent=option.explanation+'\n\n'+forecastText(p).replace('3 · Before → after this action','Actual consequence');$('consequence-next').textContent=['complete','failed'].includes(mission.state.status)?'View mission debrief →':'Next objective: '+mission.stage.title+' →';openDialog($('consequence-dialog'));updateUI();
-}
-function renderMessages(){
- if(!mission.isExpedition)return;const e=mission.state.expedition,latest=e.messages.at(-1);$('earth-request').disabled=!['playing','paused'].includes(mission.state.status)||e.askedStages.includes(e.stage)||e.outpost.energy<(mission.rules.earthMessageEnergyKwh||.15);
- $('earth-reply').textContent=latest?(latest.delivered?latest.text:'Reply in '+Math.ceil(Math.max(0,latest.due-mission.state.time))+' mission seconds. Advice describes the moment you sent it. Time pauses while reading.'): 'One-way signal time: '+mission.earthDelay().toFixed(1)+' seconds. A reply needs a round trip. ASTRA is local and immediate.';
-}
-function inspectGreenhouse(){
- if(!mission.isExpedition)return;const o=mission.state.expedition.outpost,p=powerBalance(o,mission.sunlit()),cycle=mission.rules.cropCycleHours||6;
- $('greenhouse-readout').textContent='Grow lights: '+o.foodKw+' kW\nCrop progress: '+Math.min(100,(o.growthHours||0)/cycle*100).toFixed(0)+'% · Harvests: '+(o.harvests||0)+'\nFood stored: '+o.food.toFixed(1)+' portions for four crew\nWater: '+o.water.toFixed(1)+' L\nCurrent power balance: '+p.net.toFixed(2)+' kW\nMore growing power uses the battery and extra water now; a completed crop adds '+(mission.rules.cropHarvestPortions||2)+' portions later. Change greenhouse allocation in the power and resupply plans. Inspection is free.';
- openDialog($('greenhouse-dialog'));renderer.follow=false;renderer.cameraPinned={...mission.props.find(p=>p.id==='greenhouse')};renderer.routeDistance=32*renderer.unitsPerMetre;
-}
-
 function showExpeditionDebrief(){
  const d=mission.debrief(),f=d.forecast;$('debrief-dialog').dataset.success=String(d.success);$('debrief-title').textContent=d.success?'Mission secured. Crew protected.':'Mission review: try a new plan.';$('debrief-description').textContent=d.success?mission.scenario.title+' complete. The relay is restored, the science goal is met, and the crew has a calculated four-hour resupply margin.':mission.state.failureReason+'. Replay the last checkpoint or restart the mission.';$('debrief-emblem').textContent=d.success?'✦':'↻';$('debrief-rank').textContent=mission.rank;
  $('debrief-metrics').replaceChildren(...[[d.minutes.toFixed(1),'MISSION MINUTES'],[d.distanceKm.toFixed(2)+' km','DISTANCE'],[d.science+' / '+mission.scenario.minimumScience,'SCIENCE'],[d.outpost.energy.toFixed(1)+' kWh','BATTERY'],[d.outpost.health.toFixed(0)+'%','CREW HEALTH'],[d.decisions.length+' / 7','DECISIONS']].map(([value,label])=>{const n=document.createElement('div'),v=document.createElement('strong'),l=document.createElement('span');v.textContent=value;l.textContent=label;n.append(v,l);return n;}));
  $('debrief-learning').textContent='Resupply forecast in '+f.hours+' hours: '+f.final.oxygen.toFixed(1)+' crew·h oxygen, '+f.final.water.toFixed(1)+' L water, '+f.final.food.toFixed(1)+' food portions, '+f.final.energy.toFixed(1)+' kWh, '+f.final.health.toFixed(0)+'% health. '+d.learning+' Forecast keeps the current sunlight and operating plan.';$('skill-check').hidden=true;$('course-certificate').hidden=!d.success;$('course-certificate').textContent=d.success?mission.scenario.badge+' · '+mission.xp+' XP':'';$('next-level-button').hidden=false;$('next-level-button').textContent='Choose another journey →';
- $('debrief-journal').replaceChildren(...d.decisions.map(entry=>{const row=document.createElement('div'),name=document.createElement('strong'),text=document.createElement('span');row.className='debrief-decision';name.textContent=entry.title;text.textContent=entry.label+' · '+entry.minutes+' mission minutes · effects '+Object.entries(entry.effects).map(([k,v])=>k+': '+v).join(', ');row.append(name,text);return row;}));renderRecapQuiz(d);renderRecapQuiz({...d,journal:d.journal||mission.state.journal,oxygenPercent:d.oxygenPercent});openDialog($('debrief-dialog'));
+ $('debrief-journal').replaceChildren(...d.decisions.map(entry=>{const row=document.createElement('div'),name=document.createElement('strong'),text=document.createElement('span');row.className='debrief-decision';name.textContent=entry.title;text.textContent=entry.label+' · '+entry.minutes+' mission minutes · effects '+Object.entries(entry.effects).map(([k,v])=>k+': '+v).join(', ');row.append(name,text);return row;}));openDialog($('debrief-dialog'));
 }
 function replaceSurfaceMission(destination,mode){
  keys.clear();flightRenderer.dispose();renderer.dispose?.();mission=createDestinationMission(pack,destination,storage,mode,astro);renderer=new Renderer($('world'),mission);if(flight.phase==='surface')renderer.showLandedCraft?.();flightRenderer=new FlightRenderer(renderer,flight,pack.solar);if(astro)flightRenderer.showOrbitLines=$('orbit-lines').checked;tutorial=new AcademyGuide(mission,storage);window.luna.mission=mission;window.luna.renderer=renderer;window.luna.tutorial=tutorial;displayedLesson='';const rect=$('world').getBoundingClientRect();renderer.resize(rect.width,rect.height,window.devicePixelRatio||1);applyGraphics();refreshLesson();buildSources();
@@ -1177,16 +890,9 @@ function renderScientificSky(){
  $('sky-body-list').replaceChildren(...list.map(b=>{const row=document.createElement('div'),info=document.createElement('div'),name=document.createElement('strong'),detail=document.createElement('small'),aim=document.createElement('button'),scope=document.createElement('button');row.className='sky-row';name.textContent=b.name+' · '+(b.visible?'above horizon':b.obstruction||'below horizon');detail.textContent=b.altitude.toFixed(2)+'° elevation / '+b.diameterArcsec.toFixed(2)+'″ disk / '+Math.round(b.distanceKm).toLocaleString()+' km\n'+Math.round(b.illuminated*100)+'% illuminated / light travel '+(b.lightSeconds/60).toFixed(2)+' min'+(b.name!=='Sun'&&b.diameterArcsec<60?' / unresolved to unaided eye':'');info.append(name,detail);aim.className='secondary-button';aim.textContent='Aim';aim.disabled=!b.visible;aim.addEventListener('click',()=>{if(renderer.surfaceSky.aim(b.name)){preferredPerspective='first-person';syncCameraControls();$('sky-advice').textContent='Looking toward '+b.name+'. Disk size is calculated from radius and observer distance; buildings can still block the view.';}});scope.textContent='Telescope';scope.disabled=!(b.geometricVisible??b.visible)||b.name==='Sun';scope.addEventListener('click',()=>{renderer.surfaceSky.setMagnification(Number($('telescope-magnification').value));if(renderer.surfaceSky.aim(b.name,true)){preferredPerspective='first-person';syncCameraControls();$('sky-advice').textContent=b.name+' · '+renderer.surfaceSky.magnification+'× / '+renderer.camera.fov.toFixed(2)+'° field. 80 mm aperture, ideal 1.7″ resolution; ideal aperture blur applied; static imagery and approximate rotation.';}});row.append(info,aim,scope);return row;}));
  $('astronomy-feedback').textContent='Coverage '+astro.data.start.slice(0,10)+' → '+astro.data.stop.slice(0,10)+'. '+astro.rate.toLocaleString()+'× exploration time. Closing restores the active mission clock.';
 }
-function applyGraphics(){if(!renderer.device)return;renderer.lunarClasts?.setQuality(graphicsQuality);const presets={low:[1,512],balanced:[1.5,2048],high:[2,4096]},[pixels,shadow]=presets[graphicsQuality]||presets.balanced;renderer.maxDpr=pixels;for(const light of [renderer.sun,flightRenderer?.sun].filter(Boolean)){light.shadow.mapSize.set(shadow,shadow);light.shadow.map?.dispose();light.shadow.map=null;}const rect=$('world').getBoundingClientRect();renderer.resize(rect.width,rect.height,Math.min(window.devicePixelRatio||1,pixels));}
+function applyGraphics(){if(!renderer.device)return;renderer.lunarClasts?.setQuality(graphicsQuality);const presets={low:[1,512],balanced:[1.5,1024],high:[2,2048]},[pixels,shadow]=presets[graphicsQuality]||presets.balanced;renderer.maxDpr=pixels;for(const light of [renderer.sun,flightRenderer?.sun].filter(Boolean)){light.shadow.mapSize.set(shadow,shadow);light.shadow.map?.dispose();light.shadow.map=null;}const rect=$('world').getBoundingClientRect();renderer.resize(rect.width,rect.height,Math.min(window.devicePixelRatio||1,pixels));}
 function startLocalSortie(){if(!mission.isExpedition||flight.active||dialogOpen()||skyHolding||!mission.near(mission.objects.base)||!['playing','complete'].includes(mission.state.status)||mission.state.expedition.outpost.fuel<5)return;const status=mission.state.status,utc=astro.utc;if(flight.startLocalSortie(mission.config.world,mission.terrain.geo(mission.state.player))){localSortieState={status,utc};mission.state.expedition.outpost.fuel-=5;mission.state.status='paused';mission.route=null;keys.clear();syncFlight();}}
 function setupExpeditionEvents(){
- $('decision-confirm').addEventListener('click',confirmDecision);
- $('consequence-next').addEventListener('click',()=>{$('consequence-dialog').close();processEvents();updateUI();});
- $('earth-request').addEventListener('click',()=>{if(mission.askEarth()){audio.cue('radio');renderOutpost();if($('decision-dialog').open)renderDecision();}});
- $('greenhouse-inspect').addEventListener('click',inspectGreenhouse);
- $('greenhouse-dialog').addEventListener('close',resetCamera);
- $('greenhouse-route').addEventListener('click',()=>{$('greenhouse-dialog').close();const point=renderer.crew?.stations[0];if(!point||mission.state.status!=='playing'){notice('Resume the mission first, then walk to the greenhouse.');return;}if(mission.navigate(point))notice('Walking to the greenhouse. Travel uses suit reserves; inspecting the plants is free.');else notice('No safe walking route to the greenhouse from here. Move to open ground and try again.');});
- for(const kind of ['speed','angle'])$('landing-'+kind+'-input').addEventListener('input',()=>{flight.setLandingTarget(kind,Number($('landing-'+kind+'-input').value));syncFlight();});
  document.querySelector('.playfield').append($('solar-explorer'));$('local-sortie').addEventListener('click',startLocalSortie);
  for(const mode of ['expedition','training'])$('mode-'+mode).addEventListener('click',()=>{if(flight.phase==='briefing'){gameMode=mode;writePreference('luna-game-mode-v1',mode,storage);if(!!mission.isExpedition!==(mode==='expedition'))replaceSurfaceMission(flight.destination,mode);syncFlight();}});
  $('decision-task-action').addEventListener('click',()=>{if(mission.performTask()){renderer.trigger('survey',mission.state.player);renderDecision();updateUI();}});
@@ -1200,25 +906,17 @@ function setupExpeditionEvents(){
  $('telescope-magnification').addEventListener('input',()=>{const m=Number($('telescope-magnification').value);$('telescope-output').textContent=m+'×';renderer.surfaceSky.setMagnification(m);});
  $('graphics-quality').value=readPreference('luna-graphics-v1','balanced',storage);graphicsQuality=$('graphics-quality').value;
  $('graphics-quality').addEventListener('change',()=>{graphicsQuality=$('graphics-quality').value;writePreference('luna-graphics-v1',graphicsQuality,storage);applyGraphics();});
- weatherMode=readPreference('luna-weather-v1','auto',storage);$('weather-mode').value=weatherMode;$('weather-mode').addEventListener('change',()=>{weatherMode=$('weather-mode').value;writePreference('luna-weather-v1',weatherMode,storage);syncWeather(0);});
  $('orbit-lines').checked=readPreference('luna-orbits-v1',true,storage)!==false;flightRenderer.showOrbitLines=$('orbit-lines').checked;$('orbit-lines').addEventListener('change',()=>{flightRenderer.showOrbitLines=$('orbit-lines').checked;writePreference('luna-orbits-v1',$('orbit-lines').checked,storage);});
  $('solar-body').replaceChildren(...Object.entries(astro.data.bodies).map(([name,body])=>{const option=document.createElement('option');option.value=name;option.textContent=name+' · '+body.kind;return option;}));$('solar-body').value='Earth';
  $('solar-probe').addEventListener('click',()=>{flightRenderer.probeBody=$('solar-body').value;flightRenderer.lookYaw=0;flightRenderer.lookPitch=0;$('solar-labels').hidden=true;notice('Scientific probe: apparent body size is preserved. Drag to look around. Gas and ice giants have no surface landing.');});
  $('solar-overview').addEventListener('click',()=>{flightRenderer.probeBody=null;$('solar-labels').hidden=false;$('solar-science-readout').textContent='Navigation map: r(AU)^0.42 × 65 scene units; planet radii enlarged; Moon spacing enlarged. All positions and the partial cached orbit arcs derive from the shared UTC world.';});
  $('solar-clock').addEventListener('click',()=>{toggleScientificSky(true);});
  $('flight-skip').addEventListener('click',()=>{if(flight.skipSegment())syncFlight();});
- for(const choice of ['isolate','backup']){const button=$('flight-choice-'+choice),preview=on=>{flightEventPreview=on?choice:null;syncFlightEvent(flight.phase);};
-   button.addEventListener('click',()=>{if(flight.resolveEvent(choice)){flightEventPreview=null;audio.cue('ready');syncFlight();}});
-   button.addEventListener('pointerenter',()=>preview(true));button.addEventListener('pointerleave',()=>preview(false));button.addEventListener('focus',()=>preview(true));button.addEventListener('blur',()=>preview(false));}
+ for(const choice of ['isolate','backup'])$('flight-choice-'+choice).addEventListener('click',()=>{if(flight.resolveEvent(choice)){audio.cue('ready');syncFlight();}});
  for(const q of ['Can I safely complete this EVA?','What is our biggest risk right now?','Why did our power decrease?','What happens if I activate shielding?','Which system should I repair first?','Can the crew survive until resupply?']){const button=document.createElement('button');button.textContent=q;button.addEventListener('click',()=>askAstra(q));$('astra-card').querySelector('.astra-prompts').append(button);}
 }
 
-async function loadDonkiContext(){try{const d=window.LUNA_DONKI||await (await fetch('data/donki_archive.json')).json();const n=$('donki-context');n.textContent=d.loaded&&d.events?.length?'NASA CCMC / DONKI · archived, not live. '+d.events.length+' solar-flare records. Retrieved '+d.retrievedAt+'. '+d.events.slice(0,3).map(e=>e.beginTime+' / '+e.classType).join('; '):'DONKI: no archive imported. Solar alerts are authored practice events. Flare class is not an astronaut dose.';}catch{$('donki-context').textContent='DONKI archive unavailable. Game hazards remain authored teaching scenarios.';}}
 async function boot() {
-  window.addEventListener('error',event=>{if(/ResizeObserver loop/.test(event.message||''))return; /* harmless browser notice, not a game error */ reportProblem('Script error: '+(event.message||'unknown')+'.');});
-  window.addEventListener('unhandledrejection',event=>reportProblem('Background task failed: '+(event.reason?.message||event.reason||'unknown')+'.'));
-  const pageVersion=document.querySelector('meta[name="luna-build"]')?.content;
-  if(pageVersion!==LUNA_VERSION)reportProblem('This page ('+(pageVersion||'older version')+') and the game code ('+LUNA_VERSION+') are from different versions. Run npm.cmd run build, then press Ctrl+F5.');
   try {
     const data = window.LUNA_DATA || await loadGameData();
     pack=data;
@@ -1230,13 +928,13 @@ async function boot() {
     mission = createDestinationMission(data,readPreference('luna-destination-v1','moon',storage)==='mars'?'mars':'moon',storage,gameMode,astro);
     renderer = new Renderer($('world'), mission);
     flight=new FlightSimulation(data.solar,astro);flight.select(mission.config.world);flightRenderer=new FlightRenderer(renderer,flight,data.solar);
-    tutorial = new AcademyGuide(mission,storage); audio = new MissionAudio(storage);story=new StorySequence(storage);story.attachAudio(audio);
+    tutorial = new AcademyGuide(mission,storage); audio = new Soundtrack(storage);story=new StorySequence(storage);
     labelsEnabled=readPreference('luna-labels-v1',true,storage)!==false;
     const systemReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false;
     reducedMotion = readPreference('luna-motion-v1', systemReduced, storage) === true;
-    setupEvents(); buildSources(); loadDonkiContext(); updateUI(); $('loading').hidden = true;openStory();
+  setupEvents(); applyGraphics(); buildSources(); updateUI(); $('loading').hidden = true;openStory();
     // Kept for development and reproducible engine inspection, not used by gameplay.
-    window.luna = { mission, renderer, tutorial, audio, story,flight,astro, get recap(){return currentRecap;} };syncFlight();
+    window.luna = { mission, renderer, tutorial, audio, story,flight,astro };syncFlight();
     requestAnimationFrame(animate);
   } catch (error) {
     console.error(error);
