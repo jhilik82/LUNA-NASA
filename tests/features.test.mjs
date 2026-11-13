@@ -6,7 +6,7 @@ import { createDestinationMission } from '../dist/worlds.js';
 import { AstronomicalWorld } from '../dist/astronomy-world.js';
 import { Circuit } from '../dist/engine.js';
 import { buildRecapQuiz, scoreRecap } from '../dist/recap-quiz.js';
-import { PuzzleTimer, puzzleTimeLimit, OXYGEN_MINUTES_PER_OVERTIME_SECOND } from '../dist/puzzle-timer.js';
+import { PuzzleTimer, puzzleTimeLimit, PUZZLE_TIME_SECONDS, EXTENSION_SECONDS, EXTENSION_OXYGEN_PERCENT, MAX_EXTENSIONS } from '../dist/puzzle-timer.js';
 import { chooseWeather, stageWeather, CONDITIONS, WeatherEffects } from '../dist/weather.js';
 import { installColorGrade } from '../dist/grading.js';
 import { createAstronaut, makeMaterials, SUIT_ACCENTS } from '../dist/models.js';
@@ -41,25 +41,27 @@ test('recap quiz: expedition questions ask about the decisions the player really
   assert.equal(quiz.questions.find(q => q.id === 'goal').options[quiz.questions.find(q => q.id === 'goal').answer], pack.scenarios.moon.skill);
 });
 
-test('puzzle timer: time up scrambles and restarts unless oxygen overtime is switched on', () => {
-  assert.equal(puzzleTimeLimit('relay'), 60); assert.equal(puzzleTimeLimit('outpost', true), 135);
-  const t = new PuzzleTimer(10);
-  assert.equal(t.update(4).type, 'running'); assert.equal(t.label(), '0:06'); assert.equal(t.level, 'ok');
-  t.update(4); assert.equal(t.level, 'warning');
-  assert.equal(t.update(3).type, 'reset', 'default: the bus trips'); assert.equal(t.remaining, 10); assert.equal(t.resets, 1);
-  t.update(9.5); const over = t.update(1.5, { useOxygen: true });
-  assert.equal(over.type, 'overtime'); assert.ok(Math.abs(over.oxygenMinutes - 1 * OXYGEN_MINUTES_PER_OVERTIME_SECOND) < 1e-9, 'only the seconds past zero cost oxygen');
-  assert.match(t.label(), /^\+0:01 overtime$/);
-  assert.equal(t.update(.5, { useOxygen: false }).type, 'reset', 'switching the toggle off in overtime trips the bus');
-  assert.equal(t.update(5, { paused: true }).type, 'running'); assert.equal(t.remaining, 10, 'hidden page pauses the clock');
+test('puzzle timer: 45 s, then at most two 15 s extensions, then the level restarts', () => {
+  assert.equal(PUZZLE_TIME_SECONDS, 45); assert.equal(EXTENSION_SECONDS, 15); assert.equal(EXTENSION_OXYGEN_PERCENT, 3); assert.equal(MAX_EXTENSIONS, 2);
+  for (const type of ['relay', 'rover', 'outpost']) assert.equal(puzzleTimeLimit(type), 45);
+  const t = new PuzzleTimer();
+  assert.equal(t.update(20).type, 'running'); assert.equal(t.label(), '0:25'); assert.equal(t.level, 'ok');
+  assert.equal(t.update(5, { paused: true }).type, 'running'); assert.equal(t.remaining, 25, 'hidden page pauses the clock');
+  assert.equal(t.update(26).type, 'expired'); assert.equal(t.canExtend, true); assert.equal(t.update(5).type, 'waiting', 'clock waits for a choice');
+  assert.equal(t.extend(), true); assert.equal(t.remaining, 15); assert.equal(t.extensionsLeft, 1); assert.equal(t.level, 'extra');
+  assert.equal(t.extend(), false, 'cannot extend while the clock runs');
+  assert.equal(t.update(15).type, 'expired'); assert.equal(t.extend(), true); assert.equal(t.extensionsLeft, 0);
+  assert.equal(t.update(16).type, 'out', 'after both extensions time-up restarts the level'); assert.equal(t.extend(), false);
 });
 
-test('circuit scramble never leaves the puzzle solved, and overtime oxygen can end the mission', () => {
-  const c = new Circuit(42);
+test('circuit scramble never leaves the puzzle solved, extensions cost 3% oxygen, and the level restarts', () => {
+  const c = new Circuit(42, 'relay', 3);
   for (let s = 1; s < 60; s++) { c.scramble(s); assert.equal(c.connected(), false); assert.equal(c.moves, 0); }
-  const m = mission('moon', 'training'); m.state.status = 'repair'; m.circuit = c; const before = m.state.oxygen;
-  m.spendOxygen(5); assert.equal(m.state.oxygen, before - 5); assert.equal(m.state.status, 'repair');
-  m.spendOxygen(1e6); assert.equal(m.state.oxygen, 0); assert.equal(m.state.status, 'failed'); assert.match(m.state.failureReason, /Oxygen reserve exhausted during repair overtime/);
+  const m = mission('moon', 'training'); m.state.status = 'repair'; m.circuit = c; const before = m.state.oxygen, three = .03 * m.config.suit.oxygenMinutes;
+  m.spendOxygen(three); assert.ok(Math.abs(m.state.oxygen - (before - three)) < 1e-9); assert.equal(m.state.status, 'repair');
+  m.spendOxygen(1e6); assert.equal(m.state.oxygen, 0); assert.equal(m.state.status, 'failed');
+  const t = mission('moon', 'training'); t.unlocked = 2; t.loadLevel(2); t.start(); t.state.time = 300; t.state.oxygen = 10;
+  assert.equal(t.restartLevel(), true); assert.equal(t.levelIndex, 2); assert.equal(t.state.status, 'ready'); assert.equal(t.state.time, 0); assert.equal(t.state.oxygen, t.config.suit.oxygenMinutes);
 });
 
 test('weather: every place has conditions; choice is stable, overridable and follows expedition stages', () => {
@@ -109,4 +111,32 @@ test('spacesuits: white suits with bold accent panels, a different colour for ea
   const r = rendererFixture(mission('moon', 'training'));
   const crew = new Set(r.crew.actors.map(x => { let c = null; x.model.traverse(o => { if (o.isMesh && [...mat.suitAccents.values()].length && o.material?.emissiveIntensity === .06) c = o.material.color.getHexString(); }); return c; }));
   assert.equal(crew.size, 3, 'three crewmates, three suit colours');
+});
+
+test('floating panels (ASTRA, tutorial) stay below the top bar and respect their height cap on short screens', async () => {
+  const { MovablePanel } = await import('../dist/panels.js');
+  const listeners = () => ({ addEventListener() {} });
+  const header = { getBoundingClientRect: () => ({ top: 0, bottom: 70, height: 70 }) };
+  const view = { ...listeners(), innerWidth: 910, innerHeight: 560, document: { getElementById: id => id === 'game-header' ? header : null } };
+  const style = {}, panel = { ...listeners(), style, classList: { add() {}, remove() {} }, getClientRects: () => [1], getBoundingClientRect: () => ({ left: 300, top: -200, width: 380, height: Math.min(900, parseFloat(style.maxHeight) || 900) }) };
+  const store = new Map([['luna-astra-position-v1', JSON.stringify({ x: 300, y: -200 })]]);
+  const p = new MovablePanel({ panel, handle: listeners(), storage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) }, storageKey: 'luna-astra-position-v1', view, maxHeight: 620 });
+  p.place({ x: 300, y: -200 });
+  assert.ok(parseFloat(style.top) >= 70 + 12, 'top edge below the top bar, got ' + style.top);
+  assert.ok(parseFloat(style.maxHeight) <= 560 - 70 - 24, 'fits the space under the bar');
+  view.innerHeight = 2000; p.place({ x: 300, y: 100 });
+  assert.equal(style.maxHeight, '620px', 'never taller than its cap on big screens');
+});
+
+test('a floating panel with bounds stays inside that area (flight-school card never slides under the Mission panel)', async () => {
+  const { MovablePanel } = await import('../dist/panels.js');
+  const listeners = () => ({ addEventListener() {} });
+  const view = { ...listeners(), innerWidth: 1024, innerHeight: 600, document: { getElementById: () => null } };
+  const style = {}, panel = { ...listeners(), style, classList: { add() {}, remove() {} }, getClientRects: () => [1], getBoundingClientRect: () => ({ left: 566, top: 200, width: 268, height: 300 }) };
+  let field = { left: 0, top: 46, right: 732, bottom: 572 };
+  const p = new MovablePanel({ panel, handle: listeners(), storageKey: 'k', view, bounds: () => field });
+  p.place({ x: 566, y: 200 });
+  assert.ok(parseFloat(style.left) + 268 <= 732 - 12, 'right edge inside the 3D view, got left ' + style.left);
+  field = null; p.place({ x: 566, y: 200 });
+  assert.equal(style.left, '566px', 'without bounds the whole window is usable');
 });

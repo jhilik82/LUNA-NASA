@@ -123,6 +123,36 @@ export class MissionAudio extends Soundtrack {
     osc.stop(at + duration + 0.02);
   }
 
+  // Weather ambience on the effects channel: wind and rain are filtered noise loops, solar storms add
+  // Geiger-counter clicks, thunder is a low noise burst. Levels: 0 (off) to 1.
+  setAmbience({ wind = 0, rain = 0, geiger = 0 } = {}, dt = 0) {
+    if (!this.context || !this.channels || this.context.state !== 'running') return;
+    const ctx = this.context, now = ctx.currentTime;
+    if (!this.ambience) {
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), data = buffer.getChannelData(0);
+      let brown = 0; for (let i = 0; i < data.length; i++) { const white = Math.random() * 2 - 1; brown = (brown + .02 * white) / 1.02; data[i] = i % 2 ? brown * 3.5 : white * .5; }
+      const loop = (filterType, frequency) => { const source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain(); source.buffer = buffer; source.loop = true; filter.type = filterType; filter.frequency.value = frequency; gain.gain.value = 0; source.connect(filter); filter.connect(gain); gain.connect(this.channels.effects.gain); source.start(); this.nodes.add(source); return { source, filter, gain }; };
+      this.ambience = { buffer, wind: loop('lowpass', 420), rain: loop('highpass', 2600), phase: 0 };
+    }
+    const a = this.ambience, on = this.settings.effectsOn && !this.muted && !this.hidden;
+    a.phase += dt;
+    a.wind.gain.gain.setTargetAtTime(on ? wind * (.16 + .06 * Math.sin(a.phase * .7)) : 0, now, .6);
+    a.wind.filter.frequency.setTargetAtTime(260 + wind * 520 + 140 * Math.sin(a.phase * .37), now, .8);
+    a.rain.gain.gain.setTargetAtTime(on ? rain * .09 : 0, now, .5);
+    if (on && geiger > 0 && Math.random() < geiger * dt * 9) {
+      const previous = this.channel; this.channel = 'effects';
+      try { this.tone(96 + Math.floor(Math.random() * 6), now, .025, .09, 'square'); } finally { this.channel = previous; }
+    }
+  }
+  thunder(strength = 1) {
+    if (!this.ambience || !this.settings.effectsOn || this.muted || this.hidden) return;
+    const ctx = this.context, now = ctx.currentTime, source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain();
+    source.buffer = this.ambience.buffer; filter.type = 'lowpass'; filter.frequency.value = 140;
+    gain.gain.setValueAtTime(.0001, now); gain.gain.exponentialRampToValueAtTime(.45 * strength, now + .08); gain.gain.exponentialRampToValueAtTime(.0001, now + 3.2);
+    source.connect(filter); filter.connect(gain); gain.connect(this.channels.effects.gain); source.start(now + .6 + Math.random()); source.stop(now + 4.2);
+    source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
+  }
+
   // Resume the original composition from audio.js.
   update(state, life, held = false) {
     const previous = this.channel;
