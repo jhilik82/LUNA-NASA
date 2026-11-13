@@ -32,10 +32,6 @@ npm install
 npm start
 ```
 
-Then open:
-
-- http://localhost:3000
-
 For development with rebuilds while editing:
 
 ```bash
