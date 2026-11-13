@@ -1,5 +1,13 @@
 # Release validation · 1.3.1 — 7 November 2026
 
+## ASTRA read-only agent change
+
+- Added registry snapshot and preview tests for Moon and Mars, plus preview-then-player-confirm-once and procedure boundary coverage. Numeric chat responses now carry a source tag. These checks are automated; no browser visual pass was performed for this change.
+- ASTRA UI monitoring is throttled to a five-second check cadence and advisories are deduplicated for one minute. The registry and monitor test coverage does not prove browser-level behavior for every tutorial, caption, or reduced-motion combination.
+- Real WebGL appearance, mobile layout, and accessibility behavior for the new guidance select and advisory notices remain unverified.
+- Full `npm test` (outside the sandbox so backend servers could bind localhost): 200 passed, 15 failed out of 215 at the time of the run. A later monitor edge-case test was added and passed in the focused run; the full suite was not rerun after it. Failures included surface performance expectations, a test import for the missing `SUIT_ACCENTS` export, a stale `story-replay` DOM expectation, and a deep-space lighting assertion. Focused ASTRA, app-flow, navigation, and expedition tests pass; see the test command output for the remaining failures.
+- `npm run build` and `npm run check` passed after the ASTRA changes.
+
 ## Completed
 
 - **135 Node tests passed, 0 failed** (`npm test`, about 220 seconds on Linux with Node 22). The previous 136 tests minus the three narration/voice-clip tests, plus two new ones: the story holds each caption for its reading time, and narration is fully removed (no speech API, voice settings or bundled clips).

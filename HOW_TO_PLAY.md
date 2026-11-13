@@ -54,3 +54,15 @@ In Flight school, complete the practical task to earn the badge and unlock the n
 **Mission recap quiz.** After every completed flight-school level, answer at least 2 of 4 recap questions correctly to earn the badge and unlock the next level. A wrong answer shows a hint and gives one more try (options are reshuffled). If you score under 2, take a new quiz.
 
 **ASTRA chat.** Open ASTRA and type anything: greetings, how you feel, “what should I do next?”, mission questions (oxygen, risk, power, routes like “route to Echo”), space facts or even a joke. ASTRA replies in the chat with your live mission numbers and works offline. Optional: put an Anthropic API key in `.env` as `ANTHROPIC_API_KEY=...` and restart `npm.cmd start` to let ASTRA hold free-form conversations; without it, the built-in replies are used.
+# ASTRA guidance
+
+ASTRA can read your current mission, preview a plan, and estimate a route. You still carry out physical tasks and choose mission plans yourself. Opening ASTRA or a tutorial panel does not complete an action.
+
+Choose a guidance level in **Settings**:
+
+- **Coach** asks a guiding question before a mission answer. This is the default during training and the first two outpost stages.
+- **Advisor** gives direct answers and options.
+- **Quiet** leaves unsolicited ASTRA guidance to warnings.
+
+Warnings appear when the return margin, suit reserves, habitat power, fatigue, or radiation training model crosses an authored teaching threshold. Numeric ASTRA answers identify whether the value is an authored assumption or a forecast from current mission state. Bundled science data is cached and dated, not live. ASTRA answers locally; Earth communication requests retain their light speed delay.
+
