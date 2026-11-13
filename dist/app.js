@@ -3,6 +3,7 @@ import { TrainingMission } from './academy.js';
 import { Renderer } from './render-3d.js';
 import { PuzzleTimer, puzzleTimeLimit, PUZZLE_TIME_SECONDS, EXTENSION_SECONDS, EXTENSION_OXYGEN_PERCENT, MAX_EXTENSIONS } from './puzzle-timer.js';
 import { buildRecapQuiz, scoreRecap, reshuffleQuestion } from './recap-quiz.js';
+import { astraReply, astraContext } from './astra-chat.js';
 import { chooseWeather, stageWeather } from './weather.js';
 import { AcademyGuide } from './academy-guide.js';
 import { MissionAudio } from './mission-audio.js';
@@ -16,10 +17,13 @@ import { AstronomicalWorld } from './astronomy-world.js';
 import { powerBalance } from './expedition.js';
 import { createDestinationMission } from './worlds.js';
 import { loadGameData, connectLocalBackend } from './local-backend.js';
+import { CrewLink } from './crew-link.js';
+import { CrewScene } from './crew-scene.js';
+import { CREW_MIN, CREW_STAGES, HOLD_SECONDS, formatClock as crewClock, crewTarget } from './crew-rules.js';
 
 // Game code version. index.html carries the same value in <meta name="luna-build">; if they differ, the
 // browser is running a stale build next to newer files, which is reported on screen.
-const LUNA_VERSION='1.3.3';
+const LUNA_VERSION='1.4.0';
 // Problems are shown on screen (and in the console) instead of silently breaking buttons.
 const reportedProblems=new Set();
 function reportProblem(message){
@@ -138,6 +142,7 @@ function performAction(command) {
     else { setAstraOpen(false, false); tutorial.next(); astraLessonAnswered = false; }
   }
   else if (command === 'route') plotObjective();
+  else if (command === 'crew') openCrewDialog();
   else if (command === 'interact') { mission.interact(); processEvents(); }
   else if (command === 'scan') { mission.scanNearby(); processEvents(); }
   else if (command === 'review') showDebrief();
@@ -193,14 +198,56 @@ function plotObjective() {
   renderer.trigger('route', target);
   processEvents();
 }
-function askAstra(question) {
-  if(flight?.active){const t=flight.telemetry();$('astra-message').textContent='Odyssey · '+t.location+'. '+(flight.phase==='cockpit'?'Cabin secure. Press the visible amber LAUNCH switch.':flight.phase==='transfer'&&!flight.flightEvent.resolved?'At mid-cruise, choose which electrical circuit to isolate or activate backup power.':'Follow the current flight instruction.')+' Velocity '+t.velocityMps.toFixed(1)+' m/s; cabin '+t.cabinPressureKpa.toFixed(1)+' kPa; external pressure '+t.exteriorPressureKpa.toFixed(3)+' kPa; remaining '+Math.round(t.remainingKm).toLocaleString()+' km. Gravity '+t.gravityMps2.toPrecision(3)+' m/s². This is the actual flight model state.';return;}
-  const request = resolveRouteRequest(mission, question);
-  if(request) showAssistedRoute(request);
-  else $('astra-message').textContent = mission.astra(question);
-  beep(530, 0.1);
-  if (tutorial?.active && tutorial.step.id === 'astra' && !$('astra-card').hidden) { astraLessonAnswered = true; syncTutorial(); }
-  astraPanel?.refresh();
+// ASTRA chat. The message area is a conversation log: your messages and ASTRA's replies appear as bubbles.
+// Replies come from the optional AI helper on the local server (only when it is configured), otherwise from the
+// built-in companion in astra-chat.js, which answers small talk, feelings and mission questions with live numbers.
+let astraAI=false,astraHistory=[],astraBusy=0;
+function flightAnswer(){const t=flight.telemetry();return 'Odyssey · '+t.location+'. '+(flight.phase==='cockpit'?'Cabin secure. Press the visible amber LAUNCH switch.':flight.phase==='transfer'&&!flight.flightEvent.resolved?'At mid-cruise, choose which electrical circuit to isolate or activate backup power.':'Follow the current flight instruction.')+' Velocity '+t.velocityMps.toFixed(1)+' m/s; cabin '+t.cabinPressureKpa.toFixed(1)+' kPa; external pressure '+t.exteriorPressureKpa.toFixed(3)+' kPa; remaining '+Math.round(t.remainingKm).toLocaleString()+' km. Gravity '+t.gravityMps2.toPrecision(3)+' m/s². This is the actual flight model state.';}
+function astraSay(text,{from='astra',reset=false}={}){
+  const log=$('astra-message');if(reset){log.replaceChildren?.();log.dataset.last='';astraTypingBubble=null;}
+  if(!text)return;
+  if(from==='astra'&&!reset&&log.dataset.last===text)text='Same as before: '+text;
+  const bubble=document.createElement('div');bubble.className='astra-bubble from-'+from;
+  const who=document.createElement('span');who.className='astra-who';who.textContent=from==='you'?'You':'ASTRA';
+  const body=document.createElement('p');body.textContent=text;bubble.append(who,body);log.append(bubble);
+  if(from==='astra')log.dataset.last=text;
+  while((log.children?.length||0)>40)removeChild(log,log.children[0]);
+  log.scrollTop=log.scrollHeight;
+}
+let astraTypingBubble=null;
+function removeChild(parent,child){if(child.remove)child.remove();else parent.replaceChildren(...[...parent.children].filter(c=>c!==child));}
+function astraTyping(on){
+  const log=$('astra-message');
+  if(on&&!astraTypingBubble){const dots=astraTypingBubble=document.createElement('div');dots.className='astra-bubble from-astra astra-typing';dots.setAttribute('aria-label','ASTRA is typing');dots.innerHTML='<span></span><span></span><span></span>';log.append(dots);log.scrollTop=log.scrollHeight;}
+  if(!on&&astraTypingBubble){removeChild(log,astraTypingBubble);astraTypingBubble=null;}
+}
+async function askAIHelper(question){
+  if(!astraAI)return null;
+  try{
+    const response=await fetch('/api/astra',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question,history:astraHistory.slice(-8),context:astraContext(mission,flight)})});
+    if(!response.ok){if(response.status===503)astraAI=false;return null;}
+    const data=await response.json();return typeof data.reply==='string'&&data.reply.trim()?data.reply.trim():null;
+  }catch{return null;}
+}
+function astraBuiltIn(question){
+  if(flight?.active&&!/^(hi|hello|hey|thank|bye|joke|who are|how are|i('| a)m (scared|tired|sad))/i.test(question))return flightAnswer();
+  return astraReply(question,{mission,flight})?.text||mission.astra(question);
+}
+// silent: ASTRA updates its advice without showing a question bubble (used when the panel opens).
+function askAstra(question,{silent=false}={}) {
+  const finish=()=>{if (tutorial?.active && tutorial.step.id === 'astra' && !$('astra-card').hidden) { astraLessonAnswered = true; syncTutorial(); } astraPanel?.refresh();};
+  if(silent){const text=flight?.active?flightAnswer():mission.astra(question);if($('astra-message').dataset.last!==text)astraSay(text);finish();return;}
+  astraSay(question,{from:'you'});beep(530, 0.1);
+  const request = flight?.active?null:resolveRouteRequest(mission, question);
+  if(request){showAssistedRoute(request);finish();return;}
+  const ticket=++astraBusy;astraTyping(true);
+  const started=Date.now();
+  (async()=>{
+    let reply=await askAIHelper(question);
+    if(!reply)reply=astraBuiltIn(question);
+    const wait=Math.max(0,(reducedMotion?120:420+Math.min(700,reply.length*4))-(Date.now()-started));
+    setTimeout(()=>{if(ticket===astraBusy)astraTyping(false);astraSay(reply);astraHistory.push({role:'user',content:question},{role:'assistant',content:reply});astraHistory=astraHistory.slice(-16);beep(660,.05);finish();},wait);
+  })();
 }
 function setAstraOpen(open, focus = true, refreshAdvice = true) {
   const card = $('astra-card');
@@ -208,7 +255,7 @@ function setAstraOpen(open, focus = true, refreshAdvice = true) {
   $('astra-button').setAttribute('aria-expanded', String(open));
   $('astra-button').setAttribute('aria-label', open ? 'Close ASTRA mission companion' : 'Open ASTRA mission companion');
   if (open) {
-    astraPanel?.refresh(); if(refreshAdvice && !assistedPlan) askAstra('next');
+    astraPanel?.refresh(); if(refreshAdvice && !assistedPlan) askAstra('next',{silent:true});
     if (focus) $('astra-input').focus({ preventScroll: true });
   } else if (focus) $('astra-button').focus({ preventScroll: true });
 }
@@ -220,7 +267,7 @@ function clearAssistedRoute() {
 }
 function showAssistedRoute(request) {
   clearAssistedRoute(); const result=planSurfaceRoute(mission,request);
-  $('astra-message').textContent=result.error || result.message;
+  astraSay(result.error || result.message);
   if(result.error)return;
   assistedPlan=result;renderer.assistedRoute=result;setView('surface');renderer.frameRoute?.(result.path);
   $('follow-button').setAttribute('aria-pressed','false');
@@ -232,7 +279,7 @@ function syncAssistedRoute() {
   if(['complete','failed'].includes(s.status)){clearAssistedRoute();return;}
   if(Math.hypot(s.player.x-assistedPlan.from.x,s.player.y-assistedPlan.from.y)>1||s.rover.occupied!==assistedPlan.rover){
     const refreshed=planSurfaceRoute(mission,assistedPlan.request);
-    if(refreshed.error){clearAssistedRoute();$('astra-message').textContent=refreshed.error;return;}
+    if(refreshed.error){clearAssistedRoute();astraSay(refreshed.error);return;}
     assistedPlan=refreshed;
   }
   assistedPlan.safe=s.oxygen>assistedPlan.oxygenNeed&&s.water>assistedPlan.waterNeed&&s.suitWh>assistedPlan.suitNeed&&(!s.rover.occupied||s.rover.wh>assistedPlan.roverNeed)&&assistedPlan.hasReturnPath;
@@ -250,7 +297,7 @@ function syncAssistedRoute() {
 function followAssistedRoute() {
   if(!assistedPlan||mission.state.status!=='playing')return;
   const refreshed=planSurfaceRoute(mission,assistedPlan.request);
-  if(refreshed.error){clearAssistedRoute();$('astra-message').textContent=refreshed.error;return;}
+  if(refreshed.error){clearAssistedRoute();astraSay(refreshed.error);return;}
   assistedPlan=refreshed;
   if(mission.navigate(assistedPlan.target)){
     assistedFollowing=true;renderer.assistedRoute=null;renderer.cameraPinned=null;renderer.follow=true;$('follow-button').setAttribute('aria-pressed','true');
@@ -411,6 +458,97 @@ function placeWeatherChip(dt){
     if(!hit)break;chip.style.top=Math.round(hit.bottom-field.top+10)+'px';
   }
 }
+// ---- Crew multiplayer (2 to 6 astronauts on their own devices) ----
+// The room lives on the game server; this page shows the lobby, puts everyone on the same surface, draws
+// crewmates and stations, and sends this astronaut's position. The server runs the shared mission rules.
+const crewLink=new CrewLink();let crewScene=null,crewEventAt=0,crewStatus='',crewAvailable=null;
+const crewName=()=>($('crew-name').value||readPreference('luna-crew-name-v1','',storage)||'Astronaut').trim().slice(0,16);
+async function openCrewDialog(code=''){
+  if(story?.active)finishStory(true);
+  if(code)$('crew-code').value=code;
+  if(!$('crew-name').value)$('crew-name').value=readPreference('luna-crew-name-v1','',storage)||'';
+  $('crew-error').textContent='';renderCrewDialog();openDialog($('crew-dialog'));
+  if(crewAvailable===null){crewAvailable=await crewLink.available();renderCrewDialog();}
+  (crewLink.active?$('crew-start'):code?$('crew-name'):$('crew-name')).focus?.();
+}
+function crewError(error){$('crew-error').textContent=error?.message||String(error);}
+async function crewEnter(work){
+  const name=crewName();if(!name){crewError('Type your astronaut name first.');$('crew-name').focus?.();return;}
+  writePreference('luna-crew-name-v1',name,storage);$('crew-error').textContent='';
+  for(const id of ['crew-create','crew-join'])$(id).disabled=true;
+  // The live connection opens first; the crew world is built a moment later so slow devices stay connected.
+  try{const joined=await work(name);renderCrewDialog();await new Promise(r=>setTimeout(r,50));enterCrewSurface(joined.world);renderCrewDialog();}
+  catch(error){crewError(error);}
+  finally{for(const id of ['crew-create','crew-join'])$(id).disabled=false;}
+}
+// Everyone in a crew stands on the same world, starting at Haven, and can walk around together in the lobby.
+function enterCrewSurface(world){
+  if(story?.active)finishStory(true);
+  if(mission.isCrew&&mission.config.world===world)return;
+  if(flight.destination!==world)flight.select(world);
+  if(flight.phase!=='surface')flight.enter('surface');
+  replaceSurfaceMission(world,'crew');refreshLesson();mission.start();onCrewRoom(crewLink.room);
+}
+function leaveCrewSurface(){
+  crewScene?.dispose();crewScene=null;
+  if(mission.isCrew){replaceSurfaceMission(mission.config.world,gameMode);refreshLesson();}
+}
+function onCrewRoom(room){
+  if(!room){leaveCrewSurface();renderCrewDialog();updateUI();return;}
+  if(!mission.isCrew||mission.config.world!==room.world)enterCrewSurface(room.world);
+  mission.setRoom?.(room,crewLink.playerId);crewScene?.setRoom(room,crewLink.playerId);
+  for(const e of room.events||[])if(e.at>crewEventAt){crewEventAt=e.at;if(crewEventAt>0&&Date.now()-e.at<15000)notice(e.message,/fail|ran out/i.test(e.message)?'warning':'info');}
+  const status=room.status;
+  if(status!==crewStatus){
+    if(status==='playing'&&crewStatus==='lobby'){$('crew-dialog').close();mission.state.player.x=mission.objects.base.x;mission.state.player.y=mission.objects.base.y;audio.cue?.('ready');}
+    if(status==='complete'){audio.cue?.('victory');openCrewDialog();}
+    if(status==='failed'){audio.cue?.('fail');openCrewDialog();}
+    crewStatus=status;
+  }
+  renderCrewDialog();
+}
+crewLink.onRoom(onCrewRoom);
+function renderCrewDialog(){
+  const room=crewLink.room,inCrew=crewLink.active;
+  $('crew-unavailable').hidden=crewAvailable!==false||inCrew;$('crew-entry').hidden=inCrew||crewAvailable===false;$('crew-lobby').hidden=!inCrew;
+  if(!inCrew||!room)return;
+  $('crew-code-show').textContent=room.code;
+  const links=crewLink.links.length?crewLink.links:[location.origin+'/?crew='+room.code];
+  $('crew-links').replaceChildren(...links.map(link=>{const li=document.createElement('li'),code=document.createElement('code'),copy=document.createElement('button');code.textContent=link;copy.type='button';copy.className='secondary-button';copy.textContent='Copy';
+    copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(link);copy.textContent='Copied ✓';}catch{copy.textContent='Select & copy';}setTimeout(()=>{copy.textContent='Copy';},1800);});li.append(code,copy);return li;}));
+  const online=room.players.filter(p=>p.online);
+  $('crew-lobby-roster').replaceChildren(...room.players.map(p=>{const li=document.createElement('li'),dot=document.createElement('span');dot.className='crew-dot';dot.style.background=p.color;li.append(dot,document.createTextNode(p.name+(p.id===room.hostId?' · host':'')+(p.id===crewLink.playerId?' (you)':'')+(p.online?'':' · offline')));return li;}));
+  const host=crewLink.isHost,status=room.status;
+  $('crew-start').hidden=!host;$('crew-start').disabled=online.length<CREW_MIN||status==='playing';
+  $('crew-start').textContent=status==='lobby'?'Start mission ('+online.length+' astronaut'+(online.length===1?'':'s')+')':'New round';
+  $('crew-lobby-status').textContent=status==='lobby'?(online.length<CREW_MIN?'Waiting for at least '+CREW_MIN+' astronauts. Share the link above.':host?'Everyone in? Press Start mission. Up to 6 astronauts can join.':'Waiting for the host to start the mission…'):status==='playing'?'Mission in progress. Close this window to keep playing.':room.crew?.message||'';
+  if(status!=='lobby'&&status!=='playing'){$('crew-start').disabled=false;}
+}
+async function crewStartOrReset(){
+  const room=crewLink.room;if(!room)return;$('crew-error').textContent='';
+  try{
+    if(room.status==='lobby'){if(!mission.isCrew)enterCrewSurface(room.world);const n=room.players.filter(p=>p.online).length;await crewLink.action('start',{layout:mission.planLayout(Math.min(6,n))});}
+    else await crewLink.action('lobby');
+  }catch(error){crewError(error);}
+}
+function renderCrewCard(){
+  const room=crewLink.room,card=$('crew-card');card.hidden=!mission.isCrew||!room;document.body.classList.toggle('crew-mode',!!mission.isCrew);
+  if(card.hidden)return;
+  const crew=room.crew,stage=crew?CREW_STAGES[crew.stage]:null;
+  $('crew-card-code').textContent='CODE '+room.code;
+  $('crew-card-stage').textContent=room.status==='lobby'?'Crew lobby':room.status==='complete'?'Mission complete':room.status==='failed'?'Mission failed':(crew.stage+1)+' / '+CREW_STAGES.length+' · '+stage.title+' · '+crewClock(crew.timeLimit-crew.elapsed);
+  $('crew-card-message').textContent=room.status==='lobby'?'Explore together while the crew gathers. The host starts the mission.':crew?.message||'';
+  $('crew-hold-fill').style.transform='scaleX('+(crew?Math.min(1,crew.hold/HOLD_SECONDS):0).toFixed(3)+')';
+  const live=room.players.filter(p=>p.online).sort((a,b)=>a.slot-b.slot);
+  $('crew-roster').replaceChildren(...room.players.map(p=>{
+    const li=document.createElement('li'),dot=document.createElement('span');dot.className='crew-dot';dot.style.background=p.color;
+    let where='';if(crew&&room.layout&&p.online&&room.status==='playing'){const t=crewTarget(crew,room.layout,Math.max(0,live.findIndex(q=>q.id===p.id)),live.length);where=' → '+t.label+(Number.isFinite(p.x)?' · '+Math.round(Math.hypot(p.x-t.point.x,p.y-t.point.y)*mission.terrain.cell)+' m':'');}
+    li.append(dot,document.createTextNode(p.name+(p.id===crewLink.playerId?' (you)':'')+(p.online?where+' · O₂ '+Math.round(p.oxygen)+'%':' · offline')));return li;}));
+}
+function sendCrewState(){
+  if(!crewLink.active||!mission.isCrew)return;const s=mission.state;
+  crewLink.sendState({x:s.player.x,y:s.player.y,heading:s.player.heading,jump:s.player.jump||0,moving:!!s.moving,rover:!!s.rover.occupied,oxygen:Math.max(0,Math.min(100,s.oxygen/mission.config.suit.oxygenMinutes*100))});
+}
 function finishStory(skipped=false) {
   story.finish(skipped);$('story-dialog').close();syncFlight();
 }
@@ -453,14 +591,14 @@ function refreshLesson() {
   closeWorkbench(false);panDragMode=false;$('camera-mode-button').setAttribute('aria-pressed','false');
   keys.clear(); clearAssistedRoute(); renderer.clearEffects(); renderer.refreshMission?.(); resetCamera();
   tutorial.forLevel(); shownTutorialStep=''; circuitHintStep=''; displayedLesson=''; previousOccupied=false;
-  $('notice').hidden=true; $('event-banner').hidden=true; $('astra-message').textContent=mission.astra('next');
+  $('notice').hidden=true; $('event-banner').hidden=true; astraSay(mission.astra('next'),{reset:true});
   setView('surface'); updateUI();
 }
 function renderLesson() {
   const l=mission.lesson;
   if(displayedLesson===l.id)return;
   displayedLesson=l.id;
-  $('world-title').textContent=l.title; $('world-kicker').textContent='JUNIOR ASTRONAUT / LEVEL '+(mission.levelIndex+1)+' OF '+mission.academy.levels.length;
+  $('world-title').textContent=l.title; $('world-kicker').textContent=mission.isCrew?'CREW MISSION / 2–6 ASTRONAUTS':'JUNIOR ASTRONAUT / LEVEL '+(mission.levelIndex+1)+' OF '+mission.academy.levels.length;
   $('mission-title').textContent=l.title; $('learning-goal').textContent='Learn: '+l.skill+'.';
   $('briefing-kicker').textContent='LEVEL '+(mission.levelIndex+1)+' / TRAINING BRIEFING';
   $('briefing-title').textContent=l.title; $('briefing-description').textContent=l.brief; $('briefing-skill').textContent=l.skill.toUpperCase();
@@ -556,6 +694,7 @@ function updateWayfinding() {
   }
 }
 function updateUI() {
+  renderCrewCard();
   if (!mission) return;
   document.body.classList.toggle('expedition-mode',!!mission.isExpedition);
   $('panel-systems').hidden=!mission.isExpedition;
@@ -610,7 +749,7 @@ function updateUI() {
   $('pause-button').innerHTML = s.status === 'paused' ? '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 8 6-8 6V4Z"/></svg>' : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12m6-12v12"/></svg>';
   $('tracker-status').textContent = 'CREW & EQUIPMENT';
   $('world-title').textContent=renderer.mode==='solar'?'The solar system.':renderer.mode==='orbital'?'Observe your surroundings.':mission.lesson.title;
-  $('world-kicker').textContent=renderer.mode==='surface'?'JUNIOR ASTRONAUT / LEVEL '+(mission.levelIndex+1)+' OF '+mission.academy.levels.length:'NASA/JPL · 04 OCT 2026 · '+(renderer.mode==='solar'?'SUN-CENTRED 3D':'WORLD-CENTRED VECTORS');
+  $('world-kicker').textContent=renderer.mode==='surface'?(mission.isCrew?'CREW MISSION / 2–6 ASTRONAUTS':'JUNIOR ASTRONAUT / LEVEL '+(mission.levelIndex+1)+' OF '+mission.academy.levels.length):'NASA/JPL · 04 OCT 2026 · '+(renderer.mode==='solar'?'SUN-CENTRED 3D':'WORLD-CENTRED VECTORS');
   $('world-subtitle').textContent = renderer.mode==='solar'?'Drag for a 360° orbit · distances compressed · bodies enlarged':renderer.mode==='orbital'?'Observation view · use Return to play to move on the surface':s.status==='ready'?mission.lesson.skill:next.title;
   renderer.drawMini($('minimap'), life);
   syncCameraControls();updateWorkbench();
@@ -986,6 +1125,12 @@ function setupEvents() {
   $('music-volume').addEventListener('input', () => { audio.setVolume(Number($('music-volume').value) / 100); audio.activate(); syncSettings(); });
   $('motion-button').addEventListener('click', () => { reducedMotion = !reducedMotion; writePreference('luna-motion-v1', reducedMotion, storage); renderer.clearEffects(); syncSettings(); });
   $('opening-toggle').addEventListener('click',()=>{story.setEnabled(!story.enabled);syncSettings();});
+  $('crew-button').addEventListener('click',()=>openCrewDialog());$('crew-card-open').addEventListener('click',()=>openCrewDialog());
+  $('crew-entry').addEventListener('submit',event=>{event.preventDefault();crewEnter(name=>crewLink.create(name,document.querySelector('input[name="crew-world"]:checked')?.value||'moon'));});
+  $('crew-join').addEventListener('click',()=>{const code=$('crew-code').value.trim();if(!code){crewError('Type the crew code (for example AB12) or open the link a crewmate sent you.');$('crew-code').focus?.();return;}crewEnter(name=>crewLink.join(code,name));});
+  $('crew-code').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('crew-join').click();}});
+  $('crew-start').addEventListener('click',crewStartOrReset);
+  $('crew-leave').addEventListener('click',async()=>{await crewLink.leave();crewStatus='';$('crew-dialog').close();notice('You left the crew.','info');});
   $('puzzle-extend-button').addEventListener('click',extendPuzzleTime);
   $('puzzle-restart-button').addEventListener('click',()=>restartLevelAfterPuzzle('Level restarted from the beginning.'));
   $('recap-retry').addEventListener('click',()=>{renderRecapQuiz(mission.debrief());$('recap-questions').querySelector?.('button')?.focus?.({preventScroll:true});});
@@ -1108,6 +1253,7 @@ function animateFrame(now) {
   else mission.state.moving = false;
   if(astro?.mode==='mission')astro.setMissionUTC(mission.utcStart+mission.state.time);
   updatePuzzleTimer(frameMs>0?Math.min(frameMs/1000,.25):0);syncWeather(dt);processEvents(); uiElapsed += dt;
+  sendCrewState();crewScene?.update(dt,now/1000);
   if (uiElapsed >= 0.25) { updateUI(); uiElapsed = 0; }
   audio.update(mission.state, life, tutorial.holdsTime); if(!$('story-dialog').open){if(renderer.mode==='solar')flightRenderer.drawSolarSystem();else renderer.draw(now / 1000, life);updateWayfinding();} requestAnimationFrame(animate);
 }
@@ -1161,6 +1307,8 @@ function showExpeditionDebrief(){
 }
 function replaceSurfaceMission(destination,mode){
  keys.clear();flightRenderer.dispose();renderer.dispose?.();mission=createDestinationMission(pack,destination,storage,mode,astro);renderer=new Renderer($('world'),mission);if(flight.phase==='surface')renderer.showLandedCraft?.();flightRenderer=new FlightRenderer(renderer,flight,pack.solar);if(astro)flightRenderer.showOrbitLines=$('orbit-lines').checked;tutorial=new AcademyGuide(mission,storage);window.luna.mission=mission;window.luna.renderer=renderer;window.luna.tutorial=tutorial;displayedLesson='';const rect=$('world').getBoundingClientRect();renderer.resize(rect.width,rect.height,window.devicePixelRatio||1);applyGraphics();refreshLesson();buildSources();
+ crewScene?.dispose();crewScene=mission.isCrew?new CrewScene(renderer):null;if(crewScene&&crewLink.room)crewScene.setRoom(crewLink.room,crewLink.playerId);
+ if(!mission.isCrew)document.body.classList.remove('crew-mode');
 }
 function switchSurfaceMode(mode){if(mission.isExpedition&&mission.state.status==='playing')mission.saveCheckpoint();gameMode=mode;writePreference('luna-game-mode-v1',mode,storage);replaceSurfaceMission(mission.config.world,mode);}
 function savedSelectedMission(){return gameMode==='expedition'&&readPreference('luna-expedition-v2-'+flight.destination,null,storage)?.schema===2;}
@@ -1226,6 +1374,8 @@ async function boot() {
     const localConnection = await connectLocalBackend(storage);
     storage = localConnection.storage;
     window.lunaLocal = localConnection;
+    // The optional AI helper is used only when the local server reports one is configured.
+    if(localConnection.connected)fetch('/api/health').then(r=>r.ok?r.json():null).then(h=>{astraAI=!!h?.astraAI;}).catch(()=>{});
     if(data.astronomy){astro=new AstronomicalWorld(data.astronomy,data.stars);gameMode=readPreference('luna-game-mode-v1','expedition',storage)==='training'?'training':'expedition';}
     mission = createDestinationMission(data,readPreference('luna-destination-v1','moon',storage)==='mars'?'mars':'moon',storage,gameMode,astro);
     renderer = new Renderer($('world'), mission);
@@ -1234,7 +1384,11 @@ async function boot() {
     labelsEnabled=readPreference('luna-labels-v1',true,storage)!==false;
     const systemReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false;
     reducedMotion = readPreference('luna-motion-v1', systemReduced, storage) === true;
-    setupEvents(); buildSources(); loadDonkiContext(); updateUI(); $('loading').hidden = true;openStory();
+    setupEvents(); buildSources(); loadDonkiContext(); updateUI(); $('loading').hidden = true;
+    // A crew link (?crew=CODE) goes straight to the crew lobby; a reload rejoins the same crew.
+    const crewCode=(/[?&]crew=([A-Za-z0-9]{1,8})/.exec(globalThis.location?.search||'')||[])[1];
+    if(crewCode){const saved=crewLink.saved();if(saved?.code===crewCode.toUpperCase()&&readPreference('luna-crew-name-v1','',storage)){crewLink.join(crewCode,readPreference('luna-crew-name-v1','',storage)).then(()=>openCrewDialog()).catch(()=>openCrewDialog(crewCode));}else openCrewDialog(crewCode);}
+    else openStory();
     // Kept for development and reproducible engine inspection, not used by gameplay.
     window.luna = { mission, renderer, tutorial, audio, story,flight,astro, get recap(){return currentRecap;} };syncFlight();
     requestAnimationFrame(animate);

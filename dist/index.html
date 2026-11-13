@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="luna-build" content="1.3.3">
+  <meta name="luna-build" content="1.4.0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#132127">
   <meta name="description" content="Launch from Earth, land on the Moon or Mars, and train as a junior astronaut in two ten-mission campaigns. Practise EVA, repair, power, sample handling, antenna pointing and rover deliveries with ASTRA guidance.">
   <title>LUNA + ASTRA — Mission Trainer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23132127'/%3E%3Cpath d='M42 12a22 22 0 1 0 10 36A23 23 0 0 1 42 12' fill='%23f3e8cc'/%3E%3Ccircle cx='46' cy='18' r='4' fill='%23ff915d'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=1.3.3-merged">
+  <link rel="stylesheet" href="styles.css?v=1.4.0">
 </head>
 <body>
   <div class="boot-cover" id="loading" role="status" aria-label="Loading LUNA"><span class="story-brand">LUNA<span>BEYOND THE LIFELINE</span></span></div>
@@ -19,7 +19,7 @@
     </a>
     <div class="header-center"><span class="status-dot"></span> JUNIOR ASTRONAUT ACADEMY</div>
     <nav class="header-actions" aria-label="Game tools">
-      <button class="text-button" id="journey-button">Flight · Moon / Mars</button><button class="text-button" id="sky-button">Sky guide ✦</button><button class="text-button settings-button" id="settings-button" aria-haspopup="dialog"><span aria-hidden="true">⚙</span> Settings</button>
+      <button class="text-button" id="journey-button">Flight · Moon / Mars</button><button class="text-button crew-button" id="crew-button" aria-haspopup="dialog">Crew · 2–6 players</button><button class="text-button" id="sky-button">Sky guide ✦</button><button class="text-button settings-button" id="settings-button" aria-haspopup="dialog"><span aria-hidden="true">⚙</span> Settings</button>
       <button class="text-button" id="data-button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 2 6l8 4 8-4-8-4ZM2 10l8 4 8-4M2 14l8 4 8-4"/></svg><span>Data & science</span></button>
       <button class="icon-button" id="sound-button" title="Mute soundtrack" aria-label="Mute soundtrack" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-4v12l-4-4H3V8Zm10-2c4 2 4 6 0 8"/></svg></button>
       <button class="icon-button" id="help-button" title="How to play" aria-label="How to play"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M8 7a2 2 0 0 1 4 0c0 2-2 2-2 4m0 2v1"/></svg></button>
@@ -126,6 +126,7 @@
     <aside class="mission-panel" id="mission-panel" aria-label="Mission and astronaut information">
       <div class="panel-switcher" role="group" aria-label="Mission panel view"><button id="panel-mission" aria-pressed="true">Mission</button><button id="panel-systems" aria-pressed="false" hidden>Haven systems</button><button id="hud-close" class="hud-close" aria-label="Close mission panel">×</button></div>
       <section class="academy-card"><div class="panel-title"><span>YOUR TRAINING</span><button id="levels-button">All levels ↗</button></div><strong id="cadet-rank">Junior Cadet</strong><div class="academy-progress"><span id="academy-summary">0 / 10 badges · 0 XP</span><button id="tutorial-toggle" aria-pressed="true">Tutorial on</button></div><div class="academy-badges" id="academy-badges" aria-label="Earned skill badges"></div></section>
+      <section class="crew-card" id="crew-card" aria-label="Crew mission" hidden><div class="panel-title"><span>CREW MISSION</span><span id="crew-card-code"></span></div><strong id="crew-card-stage">Crew lobby</strong><div class="crew-hold" aria-hidden="true"><i id="crew-hold-fill"></i></div><p id="crew-card-message"></p><ul class="crew-roster" id="crew-roster"></ul><button type="button" class="secondary-button" id="crew-card-open">Crew lobby ↗</button></section>
       <section class="next-action-card" id="next-action-card" aria-label="Next action"><div class="panel-title">NEXT ACTION</div><h2 id="next-action-title">Start your lesson</h2><p id="next-action-text">ASTRA will guide you through your first moonwalk.</p><button class="primary-button" id="next-action-button">Start level 1 →</button></section>
       <section class="objective-card">
         <div class="panel-title"><span>LEVEL OBJECTIVES</span><span class="mission-number">01 / 10</span></div>
@@ -156,13 +157,13 @@
   <section class="astra-popup floating-panel" id="astra-card" data-floating-panel role="dialog" aria-modal="false" aria-labelledby="astra-title" hidden>
     <div class="astra-header panel-handle-row"><button class="panel-drag-handle astra-drag-handle" id="astra-drag-handle" aria-label="Move ASTRA. Drag, or use arrow keys. Home resets its position." title="Drag to move · arrow keys also work"><span class="astra-symbol" aria-hidden="true">✦</span><span class="astra-identity"><strong id="astra-title">ASTRA</strong><small>DRAG TO MOVE</small></span><span class="drag-grip" aria-hidden="true">⠿</span></button><button class="panel-reset" id="astra-position-reset" aria-label="Reset ASTRA position" title="Reset position">↺</button><button class="astra-close" id="astra-close" aria-label="Close ASTRA" title="Close ASTRA">×</button></div>
     <div class="astra-content">
-      <div class="astra-answer-label"><span class="status-dot"></span> YOUR CURRENT MISSION</div>
-      <div class="astra-message" id="astra-message" role="log" aria-live="polite">Ready when you are, astronaut. Let’s bring Echo home.</div>
+      <div class="astra-answer-label"><span class="status-dot"></span> MISSION CHAT</div>
+      <div class="astra-message" id="astra-message" role="log" aria-live="polite"><div class="astra-bubble from-astra"><span class="astra-who">ASTRA</span><p>Ready when you are, astronaut. Ask me anything.</p></div></div>
       <div class="astra-prompts" aria-label="Quick questions"><button data-question="What should I do next?">Next move <span aria-hidden="true">↗</span></button><button data-question="Is my return reserve safe?">Can I return?</button><button data-question="Where are the satellites and planets?">Orbit</button><button data-question="Plot route to objective">Route to objective</button><button data-question="Route to Haven">Route home</button></div>
       <div class="astra-route-card" id="astra-route-card" hidden><span class="astra-route-kicker">TERRAIN-AWARE ROUTE</span><strong id="astra-route-destination">Destination</strong><div class="astra-route-metrics"><span id="astra-route-distance">— km</span><span id="astra-route-time">— min</span></div><small id="astra-route-status">PREVIEW</small><div class="astra-route-actions"><button id="astra-follow-route">Follow route →</button><button id="astra-clear-route">Clear</button></div></div>
       <button class="astra-map-pick" id="astra-pick-point">Choose a point on the map <span aria-hidden="true">⌖</span></button>
-      <form id="astra-form"><label class="sr-only" for="astra-input">Ask ASTRA about the mission</label><input id="astra-input" placeholder="Ask about your expedition…" maxlength="240" autocomplete="off"><button type="submit" aria-label="Ask ASTRA">↑</button></form>
-      <p class="astra-footnote">Try “route to Echo” or “north 200 m”. Compass directions are lunar; left/right/up/down follow the screen. Esc closes ASTRA.</p>
+      <form id="astra-form"><label class="sr-only" for="astra-input">Ask ASTRA about the mission</label><input id="astra-input" placeholder="Message ASTRA…" maxlength="240" autocomplete="off"><button type="submit" aria-label="Ask ASTRA">↑</button></form>
+      <p class="astra-footnote">Chat about anything, or try “what should I do next?”, “route to Echo” or “north 200 m”. Compass directions are lunar; left/right/up/down follow the screen. Esc closes ASTRA.</p>
     </div>
   </section>
 
@@ -263,7 +264,19 @@
     <label class="seal-control" id="seal-control" hidden><input id="shelter-seal" type="checkbox"> Seal the shelter and confirm crew inside</label><p id="power-feedback" role="status"></p><button class="primary-button" id="apply-power" disabled>Confirm systems plan →</button>
   </dialog>
   <dialog id="consequence-dialog" class="help-dialog" aria-labelledby="consequence-title"><div class="eyebrow">YOUR DECISION / YOUR CONSEQUENCE</div><h2 id="consequence-title">Here is what changed.</h2><pre id="consequence-text"></pre><button id="consequence-next" class="primary-button">Continue</button></dialog>
+<dialog id="crew-dialog" class="help-dialog crew-dialog" aria-labelledby="crew-title"><div class="dialog-heading"><div class="eyebrow">CREW MISSION · 2–6 ASTRONAUTS · EACH ON THEIR OWN DEVICE</div><button data-close class="dialog-close" aria-label="Close crew lobby">×</button></div>
+  <h2 id="crew-title">Haven Blackout.</h2>
+  <p id="crew-intro">Haven has lost power. No astronaut can fix it alone: hold two breakers at once, lock one relay dish per crewmate, carry a heavy power cell together and get everyone home in 15 minutes.</p>
+  <div class="crew-unavailable" id="crew-unavailable" hidden><strong>Crew play needs the shared game server.</strong><p>On the computer that runs the game, start it with <code>npm.cmd run multiplayer</code>, then open the address it prints. Friends on the same Wi-Fi or hotspot (no internet needed) open the crew link; for friends anywhere, see “Crew play over the internet” in HOW_TO_PLAY.md.</p></div>
+  <form class="crew-entry" id="crew-entry"><label>Your astronaut name<input id="crew-name" maxlength="16" autocomplete="nickname" placeholder="e.g. Nova" required></label>
+    <div class="crew-entry-row"><fieldset class="crew-world"><legend>Destination</legend><label><input type="radio" name="crew-world" value="moon" checked> Moon</label><label><input type="radio" name="crew-world" value="mars"> Mars</label></fieldset><button type="submit" class="primary-button" id="crew-create">Create a crew</button></div>
+    <div class="crew-entry-row"><label class="crew-code-label">Crew code<input id="crew-code" maxlength="6" autocomplete="off" placeholder="AB12" spellcheck="false"></label><button type="button" class="secondary-button" id="crew-join">Join crew</button></div></form>
+  <section class="crew-lobby" id="crew-lobby" hidden><div class="crew-code-big"><span>CREW CODE</span><strong id="crew-code-show">----</strong></div>
+    <p class="crew-share-help">Send this link to your crewmates. They open it on their own phone, tablet or computer:</p><ul class="crew-links" id="crew-links"></ul>
+    <ol class="crew-lobby-roster" id="crew-lobby-roster"></ol><p class="crew-lobby-status" id="crew-lobby-status" role="status"></p>
+    <div class="crew-lobby-actions"><button type="button" class="primary-button" id="crew-start">Start mission</button><button type="button" class="secondary-button" id="crew-leave">Leave crew</button></div></section>
+  <p class="crew-error" id="crew-error" role="alert"></p></dialog>
 <dialog id="greenhouse-dialog" class="help-dialog" aria-labelledby="greenhouse-title"><div class="dialog-heading"><div class="eyebrow">HAVEN / GREENHOUSE</div><button data-close class="dialog-close" aria-label="Close greenhouse">×</button></div><h2 id="greenhouse-title">Growing tomorrow’s food.</h2><pre id="greenhouse-readout"></pre><p>Plants grow in an accelerated teaching cycle. Real crops take far longer. The illuminated dome and botanist show the system you are managing.</p><button id="greenhouse-route" class="primary-button">Walk to the greenhouse</button><button data-close class="secondary-button">Back to mission</button></dialog>
-<script src="game.js?v=1.3.3-merged" defer></script>
+<script src="game.js?v=1.4.0" defer></script>
 </body>
 </html>

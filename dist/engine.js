@@ -1,10 +1,11 @@
+import { gaitFor, stepHop } from './surface-physics.js';
 import { createWorldLayout, isOccupied, segmentBlocked, roverCollider, BODY_RADIUS } from './world-layout.js';
 // LUNA's deterministic mission model. No DOM, network calls, or canned telemetry.
 export const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 export const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const copy = value => JSON.parse(JSON.stringify(value));
 const rad = Math.PI / 180;
-
+ 
 export function randomGenerator(seed) {
   let a = seed >>> 0;
   return () => {
@@ -14,7 +15,7 @@ export function randomGenerator(seed) {
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
 }
-
+ 
 class Heap {
   constructor() { this.items = []; }
   push(item) {
@@ -43,7 +44,7 @@ class Heap {
   }
   get size() { return this.items.length; }
 }
-
+ 
 export class Terrain {
   constructor(data) {
     if (!Number.isInteger(data.width) || !Number.isInteger(data.height) || data.width < 3 || data.height < 3 ||
@@ -145,7 +146,7 @@ export class Terrain {
     return largest;
   }
 }
-
+ 
 // Circuit repair puzzle.
 // Wires point in 8 directions (N, NE, E, SE, S, SW, W, NW = 0..7) and each click turns a tile 45°, so a tile has
 // 8 positions instead of 4. Diagonal wires link to diagonal neighbours. The board is generated from the seed and
@@ -162,7 +163,7 @@ const circuitSides = ['top','top-right','right','bottom-right','bottom','bottom-
 const circuitDirections = ['up','up-right','right','down-right','down','down-left','left','up-left'];
 const ROW_NAMES = { 3: ['top','middle','bottom'], 4: ['top','second','third','bottom'], 5: ['top','second','middle','fourth','bottom'] };
 const COLUMN_NAMES = { 3: ['left','centre','right'], 4: ['left','second','third','right'], 5: ['left','second','centre','fourth','right'] };
-
+ 
 // Difficulty 0 is the first puzzle a player meets; every level adds to it.
 export function circuitSettings(difficulty = 1) {
   const d = Math.max(0, Math.min(12, Math.round(Number(difficulty) || 0)));
@@ -175,7 +176,7 @@ export function circuitSettings(difficulty = 1) {
     presolved: Math.max(0, .45 - d * .09)                  // share of path tiles that start already lined up
   };
 }
-
+ 
 export class Circuit {
   constructor(seed, design = null, difficulty = 1) {
     const rng = randomGenerator(seed);
@@ -295,7 +296,7 @@ export class Circuit {
   }
   connected() { return this.powered().has(this.output.index) && this.connections(this.output.index).includes(this.output.side); }
 }
-
+ 
 export class Mission {
   constructor(terrainData, config, ephemerides) {
     this.terrain = new Terrain(terrainData); this.config = config; this.ephemerides = ephemerides;
@@ -386,38 +387,47 @@ export class Mission {
     if (s.status !== 'playing') return;
     dt = Math.min(dt, 0.2);
     const elapsed = dt * c.timeScale; s.time += elapsed;
-    // Visual jumps retain physical lunar gravity and real-time flight duration.
-    if (input.jump && s.player.jump === 0) s.player.jumpVelocity = 2.4;
-    s.player.jumpVelocity -= (c.physics.surfaceGravityMetresPerSecondSquared ?? c.physics.moonSurfaceGravityMetresPerSecondSquared) * dt;
-    s.player.jump = Math.max(0, s.player.jump + s.player.jumpVelocity * dt);
-    if (!s.player.jump) s.player.jumpVelocity = 0;
+    // Low-gravity movement (see surface-physics.js): ballistic hops in real time, no steering while airborne,
+    // traction-limited starts and stops, and walking speed set by the world's gravity.
+    const gait = this.gait || (this.gait = gaitFor(c.physics.surfaceGravityMetresPerSecondSquared ?? c.physics.moonSurfaceGravityMetresPerSecondSquared));
+    const inRover = s.rover.occupied;
+    Object.assign(s.player, stepHop(s.player, gait, dt, !!input.jump && !inRover));
+    const airborne = s.player.jump > 0;
     let dx = input.dx || 0, dy = input.dy || 0;
-    if (dx || dy) this.route = null;
-    if (!dx && !dy && this.route) {
+    if (airborne) { dx = 0; dy = 0; }
+    else if (dx || dy) this.route = null;
+    if (!airborne && !dx && !dy && this.route) {
       while(this.route&&this.route.index<this.route.path.length&&distance(s.player,this.route.path[this.route.index])<.00001)this.route.index++;
       const next = this.route.path[this.route.index];
       if (next) { dx = next.x - s.player.x; dy = next.y - s.player.y; }
       else this.route = null;
     }
-    const amount = Math.hypot(dx, dy), inRover = s.rover.occupied;
+    const amount = Math.hypot(dx, dy);
     const sprint = !!input.sprint && !inRover;
     const mobility=s.expedition?clamp(1-s.expedition.outpost.fatigue/180,.5,1)/s.expedition.outpost.suitFactor:1;
-    const speed = inRover ? c.roverMetresPerSecond : c.walkMetresPerSecond * mobility * (sprint ? c.sprintMultiplier : 1);
+    const speed = inRover ? c.roverMetresPerSecond : (c.walkMetresPerSecond ?? gait.walkMetresPerSecond) * mobility * (sprint ? (c.sprintMultiplier ?? gait.sprintMultiplier) : 1);
+    if (amount) { s.player.dirX = dx / amount; s.player.dirY = dy / amount; }
+    // Ground speed changes no faster than traction allows (μ·g); in the air it stays as it was at take-off.
+    const v0 = s.player.speed || 0, target = airborne ? v0 : amount && (!inRover || s.rover.wh > 0) ? speed : 0;
+    const accel = gait.acceleration * (inRover ? .7 : 1), ramp = Math.min(elapsed, Math.abs(target - v0) / accel);
+    const v1 = ramp < elapsed ? target : v0 + Math.sign(target - v0) * accel * elapsed;
+    const travelled = (v0 + v1) / 2 * ramp + target * (elapsed - ramp) * (ramp < elapsed ? 1 : 0);
+    s.player.speed = v1;
     let metres = 0, slope = 0;
     s.blocked = false; s.moving = false; s.sprinting = sprint && amount > 0;
-    if (amount && (!inRover || s.rover.wh > 0)) {
-      let step = speed * elapsed / this.terrain.cell;
-      if (this.route) step = Math.min(step, amount);
+    if (travelled > 1e-9 && s.player.dirX !== undefined) {
+      let step = travelled / this.terrain.cell;
+      if (this.route && amount) step = Math.min(step, amount);
       const before = { x: s.player.x, y: s.player.y };
-      const after = { x: before.x + dx / amount * step, y: before.y + dy / amount * step };
+      const after = { x: before.x + s.player.dirX * step, y: before.y + s.player.dirY * step };
       if (this.terrain.canStep(before, after, this.maxSlope())) {
         slope = this.terrain.slope(before, after);
-        s.player.x = after.x; s.player.y = after.y; s.player.heading = Math.atan2(dy, dx);
+        s.player.x = after.x; s.player.y = after.y; s.player.heading = Math.atan2(s.player.dirY, s.player.dirX);
         metres = step * this.terrain.cell; s.distanceMetres += metres; s.moving = true;
         if (inRover) { s.drivingMetres += metres; s.rover.x = after.x; s.rover.y = after.y; }
         else s.walkingMetres += metres;
-        if (this.route && step >= amount - 0.0001) this.route.index++;
-      } else { s.blocked = true; this.route = null; }
+        if (this.route && amount && step >= amount - 0.0001) this.route.index++;
+      } else { s.blocked = true; this.route = null; s.player.speed = 0; }
     }
     const exertion = s.moving ? (sprint ? c.suit.sprintOxygenMultiplier : 1.12) * (1 + slope / 160) : 1;
     s.oxygen = Math.max(0, s.oxygen - elapsed / 60 * (inRover ? 1 : exertion));
@@ -579,3 +589,4 @@ export class Mission {
     return s.phase === 'relay' ? `Your first objective is the surface relay, about ${(d / 1000).toFixed(2)} km away. Follow its orange marker. Get close and press E to reconnect the power path. Cyan surveys are optional.` : s.phase === 'recover' ? `The relay is online. Echo is ${(d / 1000).toFixed(2)} km from your current position. Approach the rover, press E, and reconnect its power bus. Keep an eye on the Lifeline.` : `Echo’s power bus is repaired. ${s.rover.occupied ? 'Drive the rover to Haven and press E to dock.' : 'Get close to Echo and press E to board, then bring it home.'} The white return ribbon leads to the outpost.`;
   }
 }
+ 

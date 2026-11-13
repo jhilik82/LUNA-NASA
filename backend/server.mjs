@@ -4,6 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LocalStore } from './store.mjs';
 import { registerDatasets, currentManifest } from './datasets.mjs';
+import { askAstraAI, astraAIConfigured } from './astra-ai.mjs';
+import { RoomHub } from './rooms.mjs';
+import os from 'node:os';
 
 export const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIME = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.zip': 'application/zip' };
@@ -34,7 +37,20 @@ async function body(req) {
   catch { throw Object.assign(new Error('Invalid JSON'), { status: 400 }); }
 }
 
-export async function createLunaServer({ root = PROJECT_ROOT, dataDirectory, dev = false } = {}) {
+// Addresses other devices on this network can use to reach the game (for crew links).
+export function networkAddresses() {
+  return Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
+}
+// A request from this computer itself (not another device, and not relayed by a tunnel or online proxy).
+function fromThisComputer(req) {
+  const address = req.socket.remoteAddress || '';
+  return /^(127\.|::1$|::ffff:127\.)/.test(address) && !req.headers['x-forwarded-for'] && !req.headers['cf-connecting-ip'] && !req.headers.forwarded;
+}
+
+// shared: other devices may open the game (crew multiplayer on Wi-Fi, through a tunnel, or on an online host).
+// Saves, the data workspace and the AI helper still answer only to requests from this computer.
+export async function createLunaServer({ root = PROJECT_ROOT, dataDirectory, dev = false, shared = false, rooms = null } = {}) {
+  const hub = rooms || new RoomHub();
   const dist = path.join(root, 'dist');
   const store = new LocalStore(dataDirectory || path.resolve(root, process.env.LUNA_DATA_DIR || 'backend/data'));
   await registerDatasets(path.join(dist, 'data'), store);
@@ -43,13 +59,35 @@ export async function createLunaServer({ root = PROJECT_ROOT, dataDirectory, dev
   const server = http.createServer(async (req, res) => {
     try {
       const expectedHost = req.headers.host || '';
-      if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(expectedHost)) return json(res, 403, { error: 'Localhost requests only' });
-      if (req.headers.origin && req.headers.origin !== 'http://' + expectedHost) return json(res, 403, { error: 'Origin does not match this local workspace' });
+      if (!shared && !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(expectedHost)) return json(res, 403, { error: 'Localhost requests only' });
+      if (shared && !/^[a-z0-9.:\[\]-]{1,255}$/i.test(expectedHost)) return json(res, 400, { error: 'Invalid host' });
+      if (req.headers.origin && req.headers.origin !== 'http://' + expectedHost && req.headers.origin !== 'https://' + expectedHost) return json(res, 403, { error: 'Origin does not match this local workspace' });
       const url = new URL(req.url, 'http://' + expectedHost);
-      const route = url.pathname;
+      const route = url.pathname, local = !shared || fromThisComputer(req);
+      // Another device: only the game itself, its data and crew rooms. Saves stay on each player's own device.
+      if (!local && (route.startsWith('/workspace') || route.startsWith('/api/progress') || route === '/api/source-checks' || route.startsWith('/__dev') || (route === '/api/astra' && process.env.ASTRA_AI_FOR_GUESTS !== 'true')))
+        return json(res, 403, { error: 'Only available on the computer running the game server' });
+      if (route.startsWith('/api/rooms')) {
+        const parts = route.split('/').filter(Boolean); // api, rooms, CODE, verb
+        const proto = req.headers['x-forwarded-proto'] === 'https' || req.socket.encrypted ? 'https' : 'http', port = expectedHost.split(':')[1];
+        const links = code => {
+          const own = proto + '://' + expectedHost + '/?crew=' + code;
+          const lan = /^(localhost|127\.0\.0\.1)(:|$)/.test(expectedHost) ? networkAddresses().map(a => 'http://' + a + (port ? ':' + port : '') + '/?crew=' + code) : [];
+          const pub = process.env.PUBLIC_URL ? [process.env.PUBLIC_URL.replace(/\/$/, '') + '/?crew=' + code] : [];
+          return [...new Set([...pub, ...lan, own])].filter(l => !/\/\/(localhost|127\.0\.0\.1)[:/]/.test(l) || !lan.length);
+        };
+        if (!shared) return json(res, 409, { error: 'Crew multiplayer is off. Start the game with npm.cmd run multiplayer so other devices can join.' });
+        if (parts.length === 2 && req.method === 'POST') { const created = hub.create(await body(req)); return json(res, 200, { ...created, links: links(created.code) }); }
+        const code = parts[2], verb = parts[3];
+        if (verb === 'join' && req.method === 'POST') { const joined = hub.join(code, await body(req)); return json(res, 200, { ...joined, links: links(joined.code) }); }
+        if (verb === 'stream' && req.method === 'GET') { hub.stream(code, { playerId: url.searchParams.get('player'), token: url.searchParams.get('token') }, res); return; }
+        if (verb === 'state' && req.method === 'POST') return json(res, 200, hub.update(code, await body(req)));
+        if (verb === 'action' && req.method === 'POST') return json(res, 200, hub.action(code, await body(req)));
+        return json(res, 404, { error: 'Unknown crew route' });
+      }
       if (route === '/api/health' && req.method === 'GET') {
         const manifest = await currentManifest(store);
-        return json(res, 200, { ok: true, storage: 'local-files', development: dev, datasetVersion: manifest.version, supabaseConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) });
+        return json(res, 200, { ok: true, storage: 'local-files', development: dev, datasetVersion: manifest.version, supabaseConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY), astraAI: astraAIConfigured() && (local || process.env.ASTRA_AI_FOR_GUESTS === 'true'), multiplayer: shared, thisComputer: local });
       }
       if (route === '/api/datasets' && req.method === 'GET') return json(res, 200, await currentManifest(store));
       if (route === '/api/source-checks' && req.method === 'GET') {
@@ -57,6 +95,11 @@ export async function createLunaServer({ root = PROJECT_ROOT, dataDirectory, dev
         try { checks = JSON.parse(await fs.readFile(path.join(store.directory, 'source-checks.json'), 'utf8')); }
         catch (error) { if (error.code !== 'ENOENT') throw error; }
         return json(res, 200, checks);
+      }
+      if (route === '/api/astra' && req.method === 'POST') {
+        if (!astraAIConfigured()) return json(res, 503, { error: 'ASTRA AI helper is not configured' });
+        try { return json(res, 200, { reply: await askAstraAI(await body(req)) }); }
+        catch (error) { return json(res, error.status || 502, { error: error.message }); }
       }
       if (route === '/api/progress' && req.method === 'GET') return json(res, 200, (await store.read()).progress);
       if (route === '/api/progress' && req.method === 'PUT') {
@@ -120,19 +163,26 @@ export async function createLunaServer({ root = PROJECT_ROOT, dataDirectory, dev
       if (!error.status && error.code !== 'ENOENT') console.error(error.message);
     }
   });
-  server.on('close', () => { for (const response of clients) response.end(); });
-  return { server, store, notifyReload, closeConnections: () => { for (const response of clients) response.end(); } };
+  server.on('close', () => { for (const response of clients) response.end(); if (!rooms) hub.close(); });
+  return { server, store, rooms: hub, notifyReload, closeConnections: () => { for (const response of clients) response.end(); } };
 }
 
-export function listen(server, port = Number(process.env.PORT || 3000)) {
+export function listen(server, port = Number(process.env.PORT || 3000), { shared = false } = {}) {
   return new Promise((resolve, reject) => {
     server.once('error', error => {
       console.error(error.code === 'EADDRINUSE' ? 'Port ' + port + ' is busy. Close the other server or set PORT in .env.' : error.message);
       reject(error);
     });
-    server.listen(port, '127.0.0.1', () => {
+    // Shared (crew multiplayer) mode listens on every network interface so phones and other computers can join.
+    server.listen(port, shared ? (process.env.HOST || '0.0.0.0') : '127.0.0.1', () => {
     const activePort = server.address().port;
     console.log('LUNA game: http://localhost:' + activePort);
+    if (shared) {
+      console.log('Crew multiplayer is ON. Other devices on this Wi-Fi/hotspot can open:');
+      for (const address of networkAddresses()) console.log('  http://' + address + ':' + activePort);
+      if (process.env.PUBLIC_URL) console.log('Online address: ' + process.env.PUBLIC_URL);
+      console.log('If Windows asks, allow Node.js on Private networks.');
+    }
     console.log('Local data and saves: http://localhost:' + activePort + '/workspace');
     resolve(activePort);
     });

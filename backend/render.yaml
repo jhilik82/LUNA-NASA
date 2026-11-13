@@ -1,0 +1,13 @@
+# One-click online hosting for LUNA crew multiplayer on Render (https://render.com).
+# New > Blueprint > pick this repository. Players then share https://<your-service>.onrender.com/?crew=CODE
+services:
+  - type: web
+    name: luna-crew
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm run multiplayer
+    healthCheckPath: /api/health
+    envVars:
+      - key: LUNA_MULTIPLAYER
+        value: "true"

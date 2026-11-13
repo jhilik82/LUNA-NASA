@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {createAstronaut,SUIT_ACCENTS} from './models.js';
 import {batchStaticMeshes} from './static-batch.js';
 import {isOccupied} from './world-layout.js';
-
+ 
 /** Three visible coworkers plus the player = four crew. Decorative routines use
  * the real collision grid, but never secretly complete tasks or spend resources. */
 export class CompanionCrew {
@@ -17,7 +17,7 @@ export class CompanionCrew {
   this.actors=this.stations.map((p,i)=>{const model=createAstronaut(renderer.mat,{accent:[SUIT_ACCENTS.botanist,SUIT_ACCENTS.engineer,SUIT_ACCENTS.scientist][i]});batchStaticMeshes(model);model.name=['Botanist Mira','Engineer Sol','Scientist Kai'][i];if(renderer.physical)model.scale.setScalar(.35*renderer.unitsPerMetre);this.group.add(model);return {model,position:{...p},station:i,wait:5+i*3,phase:i,path:[],index:0};});
  }
  update(dt,time){
-  const r=this.renderer,m=this.mission;this.group.visible=!r.cinematic&&!r.skyOnly;if(!this.group.visible)return;
+  const r=this.renderer,m=this.mission;this.group.visible=!r.cinematic&&!r.skyOnly&&!m.isCrew;if(!this.group.visible)return; // real crewmates replace the decorative crew in multiplayer
   const active=m.state.status==='playing'&&!r.reducedMotion;
   for(const a of this.actors){
    let walking=false;
@@ -33,3 +33,4 @@ export class CompanionCrew {
   }
  }
 }
+ 

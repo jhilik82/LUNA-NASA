@@ -452,3 +452,62 @@ body.in-story #world{position:absolute;inset:0;width:100%;height:100%;border-rad
 .recap-hint{margin:6px 0 0!important;padding:7px 10px;border-radius:7px;background:#2a2410;border:1px solid #c9a24a77;color:#ffe7b0;font-weight:500!important;font-size:12.5px}
 #recap-score[data-result="fail"]{color:#ff9a8a}
 #recap-retry{margin-top:8px}
+
+/* ASTRA chat log: your messages on the right, ASTRA's replies on the left, with a typing indicator. */
+#astra-card .astra-message{display:flex;flex-direction:column;gap:8px;max-height:min(260px,34dvh);min-height:72px;overflow-y:auto;padding:10px;font-size:12.5px;line-height:1.5;color:#d6e6e2}
+.astra-bubble{max-width:88%;padding:7px 10px;border-radius:12px;background:#ffffff0f;border:1px solid #ffffff14;align-self:flex-start;animation:astra-in .18s ease-out}
+.astra-bubble p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.astra-who{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:#7be8db;margin-bottom:2px}
+.astra-bubble.from-you{align-self:flex-end;background:#2b5f5a;border-color:#4fb8ab66;border-bottom-right-radius:4px}
+.astra-bubble.from-you .astra-who{color:#bff3ea;text-align:right}
+.astra-bubble.from-astra{border-bottom-left-radius:4px}
+.astra-typing{display:flex;gap:4px;padding:10px 12px}
+.astra-typing span{width:6px;height:6px;border-radius:50%;background:#7be8db;animation:astra-dot 1s infinite ease-in-out}
+.astra-typing span:nth-child(2){animation-delay:.15s}.astra-typing span:nth-child(3){animation-delay:.3s}
+@keyframes astra-dot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+@keyframes astra-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.astra-bubble,.astra-typing span{animation:none}}
+@media (max-height:820px){#astra-card .astra-message{max-height:min(200px,30dvh);font-size:12px}}
+/* Quick questions sit in one scrollable row so the conversation gets the space. */
+#astra-card .astra-prompts{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding-bottom:4px;scrollbar-width:thin;margin-bottom:8px}
+#astra-card .astra-prompts button{flex:0 0 auto;white-space:nowrap}
+#astra-card .astra-message{max-height:min(320px,42dvh)}
+@media (max-height:820px){#astra-card .astra-message{max-height:min(240px,36dvh)}}
+
+/* ---- Crew multiplayer ---- */
+.crew-button{border-color:#3dd6c666!important}
+body.crew-mode .academy-card{display:none}
+.crew-card{padding:14px;border:1px solid #3dd6c655;border-radius:14px;background:linear-gradient(160deg,#0f2a2b,#0b151c);display:grid;gap:8px}
+.crew-card strong{font-size:15px;color:#e8fbf8}
+.crew-card p{margin:0;font-size:12.5px;line-height:1.5;color:#bcd3cf}
+.crew-hold{height:6px;border-radius:4px;background:#ffffff14;overflow:hidden}
+.crew-hold i{display:block;height:100%;background:linear-gradient(90deg,#3dd6c6,#9dffb0);transform-origin:left;transform:scaleX(0);transition:transform .2s linear}
+.crew-roster,.crew-lobby-roster{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:12px;color:#d6e6e2}
+.crew-roster li,.crew-lobby-roster li{display:flex;align-items:center;gap:7px}
+.crew-dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px;box-shadow:0 0 0 2px #ffffff22}
+.crew-dialog{max-width:min(560px,calc(100vw - 24px))}
+.crew-dialog p{line-height:1.55}
+.crew-entry{display:grid;gap:14px;margin-top:10px}
+.crew-entry label{display:grid;gap:6px;font-size:12px;letter-spacing:.06em;color:#a9c3be}
+.crew-entry input[type=text],.crew-entry input:not([type]),#crew-code,#crew-name{padding:10px 12px;border-radius:10px;border:1px solid #3c5960;background:#0a141a;color:#eef7f5;font-size:15px}
+#crew-code{text-transform:uppercase;letter-spacing:.2em;font-family:var(--mono);max-width:150px}
+.crew-entry-row{display:flex;flex-wrap:wrap;align-items:end;gap:12px}
+.crew-entry-row>button{flex:1 1 160px;min-height:42px}
+.crew-world{border:1px solid #2f4a52;border-radius:10px;padding:6px 12px;display:flex;gap:14px;margin:0}
+.crew-world legend{font-size:11px;color:#a9c3be;padding:0 4px}
+.crew-world label{display:flex;gap:6px;align-items:center;font-size:14px;color:#eef7f5;letter-spacing:0}
+.crew-code-label{flex:0 0 auto}
+.crew-code-big{display:flex;align-items:baseline;gap:12px;margin:8px 0}
+.crew-code-big span{font-size:11px;letter-spacing:.14em;color:#a9c3be}
+.crew-code-big strong{font-family:var(--mono);font-size:30px;letter-spacing:.24em;color:#7be8db}
+.crew-links{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px}
+.crew-links li{display:flex;gap:8px;align-items:center}
+.crew-links code{flex:1;min-width:0;overflow-wrap:anywhere;padding:7px 9px;border-radius:8px;background:#0a141a;border:1px solid #2f4a52;font-size:12.5px;color:#cfe9e4}
+.crew-links button{flex:0 0 auto;min-height:34px;padding:0 12px}
+.crew-lobby-roster{margin:10px 0;font-size:14px}
+.crew-lobby-status{font-size:13px;color:#ffd27a}
+.crew-lobby-actions{display:flex;flex-wrap:wrap;gap:10px}
+.crew-lobby-actions button{flex:1 1 160px;min-height:42px}
+.crew-error{color:#ff9a8a;font-size:13px;min-height:1em;margin:8px 0 0}
+.crew-unavailable{padding:12px 14px;border-radius:10px;border:1px solid #ffb34766;background:#2a1f0c;color:#ffe7c2;font-size:13px}
+.crew-unavailable code{color:#fff}

@@ -1,3 +1,5 @@
+import { gaitFor } from './surface-physics.js';
+import { CrewMission } from './crew-mission.js';
 import { Terrain } from './engine.js';
 import { TrainingMission } from './academy.js';
 import { ExpeditionMission } from './expedition.js';
@@ -11,7 +13,7 @@ export function marsTrainingTerrain(regional){
 export function createDestinationMission(pack,destination,storage,mode='training',astroWorld=null){
  const mars=destination==='mars',config=copy(pack.config),academy=copy(pack.academy),terrain=mars?marsTrainingTerrain(pack.marsTerrain):(pack.tranquillitatis||pack.terrain);
  if(astroWorld){config.physicalScale=true;config.interactionMetres=6;config.art.terrainVerticalExaggeration=1;config.astronomyTrainingTargets=['Earth','Sun'];config.assumptions=['The original terrain elevation grid and celestial directions come from cached NASA / JPL data. Reference-inspired local craters, scarps, dunes, channels, terraces, rocks and outposts are authored reconstructions layered over that grid. Weather, hazards and consumption rates are game models.','Terrain vertical exaggeration is 1.0; equipment and astronaut dimensions are converted to metres. Movement uses 10× mission time.','The apparent sky retains physical angular diameters. Optical points indicate unresolved bright planets; planetary brightness and compressed eye adaptation are approximate.','Outpost choices and forecasts use one shared state. EVA map colours use conservative distance estimates; the exact return readout follows the shared measured-plus-authored surface route.'];}
- config.world=destination;config.worldName=WORLDS[destination].name;config.physics.surfaceGravityMetresPerSecondSquared=WORLDS[destination].gravity;
+ config.world=destination;config.worldName=WORLDS[destination].name;config.physics.surfaceGravityMetresPerSecondSquared=WORLDS[destination].gravity;{const gait=gaitFor(WORLDS[destination].gravity);config.walkMetresPerSecond=gait.walkMetresPerSecond;config.sprintMultiplier=gait.sprintMultiplier;}
  config.assumptions=config.assumptions.filter(x=>!/not merged|fixed direction|lunar ICRF|illustrative and is not/i.test(x));
  config.astronomyTrainingTargets=astroWorld?['Earth','Sun']:mars?['Earth','Sun']:['Earth','LRO'];
  if(mars){
@@ -24,8 +26,10 @@ export function createDestinationMission(pack,destination,storage,mode='training
   ephemerides={schema:1,start:'2026-10-04T00:00:00 TDB',stop:'2026-10-05T00:00:00 TDB',frame:'Mars-centered ICRF',bodies:Object.entries(pack.solar.vectors).filter(([n])=>n!=='Mars').map(([name,b])=>({name,available:true,samplingSeconds:3600,samples:b.samples.map((a,i)=>{const m=pack.solar.vectors.Mars.samples[i],x=a.x-m.x,y=a.y-m.y,z=a.z-m.z;return{jdTdb:a.jdTdb,x,y:y*Math.cos(ob)-z*Math.sin(ob),z:y*Math.sin(ob)+z*Math.cos(ob)};})}))};
  }
  const worldStorage=storage&&{getItem:k=>storage.getItem(k==='luna-academy-v1'&&mars?'luna-academy-mars-v1':k),setItem:(k,v)=>storage.setItem(k==='luna-academy-v1'&&mars?'luna-academy-mars-v1':k,v)};
- const mission=mode==='expedition'&&pack.scenarios?new ExpeditionMission(terrain,config,ephemerides,academy,pack.scenarios,storage):new TrainingMission(terrain,config,ephemerides,academy,worldStorage);mission.solar=pack.solar;mission.astroWorld=astroWorld;mission.regionalTerrain=mars&&astroWorld?new Terrain(pack.marsTerrain):null;
+ if(mode==='crew')config.timeScale=5; // crew missions run in real-time teamwork: a gentler clock keeps suit supplies sensible
+ const mission=mode==='crew'?new CrewMission(terrain,config,ephemerides,academy,worldStorage):mode==='expedition'&&pack.scenarios?new ExpeditionMission(terrain,config,ephemerides,academy,pack.scenarios,storage):new TrainingMission(terrain,config,ephemerides,academy,worldStorage);mission.solar=pack.solar;mission.astroWorld=astroWorld;mission.regionalTerrain=mars&&astroWorld?new Terrain(pack.marsTerrain):null;
  if(astroWorld){mission.utcStart=astroWorld.utc;mission.astronomy=()=>{const observer=astroWorld.observer(destination,mission.terrain.geo(mission.state.player)),list=astroWorld.sky(destination,mission.terrain.geo(mission.state.player)).bodies;return list.map(b=>({...b,available:true,inCoverage:true,position:{x:b.icrf.x*b.distanceKm,y:b.icrf.y*b.distanceKm,z:b.icrf.z*b.distanceKm},source:'Shared Sun-centered ICRF / UTC clock',timeScale:'UTC'}));};}
  installReferenceLandscape(mission);
  return mission;
 }
+ 

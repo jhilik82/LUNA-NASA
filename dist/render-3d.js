@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { gaitFor } from './surface-physics.js';
 import {createGreenhouse} from './greenhouse.js';
 import {CompanionCrew} from './companion-crew.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -9,15 +10,17 @@ import { WORLD_SCALE, isOccupied } from './world-layout.js';
 import { openingMotion, astronautPose, ballisticDust } from './animation.js';
 import { TrackingMaps } from './maps.js';
 import { batchStaticMeshes } from './static-batch.js';
+import { gradeRenderer } from './grading.js';
+import { WeatherEffects } from './weather.js';
 import { materialDetail } from './material-detail.js';
 import { surfaceMaterials, surfaceRockGeometry, applySurfaceMaps } from './surface-materials.js';
 import { referencePatches, surfaceGeometry, removePatchTriangles, layeredOutcropGeometry, surfaceSample, renderedSurfaceHeight } from './reference-geometry.js';
 import { applyLunarRegolithShader, LunarClastField, lunarImpressionMaterial, footprintRotation } from './lunar-surface.js';
-import { makeMaterials, applyMaterialDetail, mesh, createAstronaut, createRover, createHabitat, createAirlock, createSolar, createRelay, createTank, createSatellite, createSurvey, createTrainingBench, createLander } from './models.js';
-
+import { makeMaterials, applyMaterialDetail, mesh, createAstronaut, SUIT_ACCENTS, createRover, createHabitat, createAirlock, createSolar, createRelay, createTank, createSatellite, createSurvey, createTrainingBench, createLander } from './models.js';
+ 
 const V = THREE.Vector3;
 const smooth = t => t*t*(3-2*t);
-
+ 
 export class Renderer {
   constructor(canvas, mission, { device = null, createCanvas = null } = {}) {
     this.canvas=canvas;this.mission=mission;this.unitsPerMetre=mission.config.physicalScale?WORLD_SCALE/mission.terrain.cell:1;this.physical=!!mission.config.physicalScale;
@@ -38,7 +41,7 @@ export class Renderer {
     this.mat=makeMaterials();this.addSurfaceDetail();this.maps=new TrackingMaps(mission);this.orbitCanvas=this.createCanvas(1000,720);
     this.device=device||new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
     this.device.setClearColor('#020408',1);this.device.shadowMap.enabled=true;this.device.shadowMap.type=THREE.PCFSoftShadowMap;
-    this.device.toneMapping=THREE.ACESFilmicToneMapping;this.device.toneMappingExposure=1.15;this.device.outputColorSpace=THREE.SRGBColorSpace;
+    this.device.toneMapping=THREE.ACESFilmicToneMapping;gradeRenderer(this.device);this.device.toneMappingExposure=1.15;this.device.outputColorSpace=THREE.SRGBColorSpace;
     this.buildTerrain();this.buildScenery();this.buildSky();
     this.footprints=new THREE.InstancedMesh(new THREE.PlaneGeometry(mission.config.world==='moon'?.19:.14,mission.config.world==='moon'?.34:.33).rotateX(-Math.PI/2),mission.config.world==='moon'?lunarImpressionMaterial('boot',this.unitsPerMetre):new THREE.MeshStandardMaterial({color:'#45413b',roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}),768);this.footprints.count=0;this.footprints.frustumCulled=false;this.footprintCursor=0;this.scene.add(this.footprints);
     this.player=createAstronaut(this.mat);this.rover=createRover(this.mat,mission.config.world);batchStaticMeshes(this.player);batchStaticMeshes(this.rover);this.scene.add(this.player,this.rover);if(this.physical){this.player.scale.setScalar(.35*this.unitsPerMetre);this.rover.scale.setScalar(.7*this.unitsPerMetre);}this.buildCinematic();
@@ -75,7 +78,7 @@ export class Renderer {
     scored.sort((a,b)=>a.score-b.score);this.landingPoint=scored[0]?.point||candidates[0];
     this.landingOrigin=this.world(this.landingPoint);
     for(let i=0;i<4;i++){const a=Math.PI/4+i*Math.PI/2;this.landingOrigin.y=Math.max(this.landingOrigin.y,this.world({x:this.landingPoint.x+Math.cos(a)*5.3/c,y:this.landingPoint.y+Math.sin(a)*5.3/c}).y);}
-    this.mentor=createAstronaut(this.mat);if(this.physical)this.mentor.scale.setScalar(.35*this.unitsPerMetre);this.mentor.name='flight-school-instructor';this.cinemaGroup.add(this.mentor);
+    this.mentor=createAstronaut(this.mat,{accent:SUIT_ACCENTS.mentor});if(this.physical)this.mentor.scale.setScalar(.35*this.unitsPerMetre);this.mentor.name='flight-school-instructor';this.cinemaGroup.add(this.mentor);
     this.plume=mesh(this.lander,new THREE.ConeGeometry(.95,2.8,20,1,true),new THREE.MeshBasicMaterial({color:'#c4dcfa',transparent:true,opacity:.22,depthTest:true,depthWrite:false}),[0,0,0],null,'vacuum-exhaust');this.plume.castShadow=false;
     this.engineLight=new THREE.PointLight('#bccfff',0,16,2);this.lander.add(this.engineLight);this.engineLight.position.y=1.4;
     const rng=randomGenerator(882),geometry=new THREE.IcosahedronGeometry(1,0);this.cinemaDust=[];
@@ -202,6 +205,7 @@ export class Renderer {
   configureWorld(world){
     this.earth.visible=false;this.stars.visible=false;this.surfaceSky?.dispose();this.surfaceSky=this.mission.astroWorld?new ScientificSurfaceSky(this,this.mission.astroWorld,world):new SurfaceSky(this,this.mission.solar,world);
     this.mat.regolith.color.set(world==='mars'?'#a58b72':'#92918b');
+    this.weather?.dispose();this.weather=new WeatherEffects(this.scene,{scale:this.unitsPerMetre,place:world==='mars'?'mars':'moon'});
     if(world==='moon'&&this.physical){
       this.ambient.color.set('#000000');this.ambient.groundColor.set('#8c8981');this.ambient.intensity=.035;
       this.device.shadowMap.type=THREE.PCFShadowMap;
@@ -355,12 +359,17 @@ export class Renderer {
     this.rover.position.copy(this.world(point,.03));this.rover.rotation.set(-Math.atan2(front-back,3.04*scale),yaw,Math.atan2(high-low,5.1*scale),'YXZ');
   }
   updateActors(dt,time=0) {
-    const s=this.mission.state;this.player.position.copy(this.world(s.player,s.player.jump*(this.physical?this.unitsPerMetre:1.2)));
+    const s=this.mission.state,gait=this.mission.gait||gaitFor(this.mission.config.physics.surfaceGravityMetresPerSecondSquared);
+    // Each low-gravity step is a short bound: the body rises with the stride (higher on the Moon than on Mars).
+    const bounce=s.moving&&!s.rover.occupied&&!s.player.jump&&!this.reducedMotion?gait.stepBounceMetres*Math.abs(Math.sin(this.stepPhase))*(this.gaitStrength||0):0;
+    this.player.position.copy(this.world(s.player,(s.player.jump+bounce)*(this.physical?this.unitsPerMetre:1.2)));
+    if(this.wasAirborne&&!s.player.jump)this.landingDust(s.player);this.wasAirborne=s.player.jump>0;
     this.player.rotation.y=Math.PI/2-s.player.heading;this.player.visible=!s.rover.occupied&&!s.training?.inside&&this.perspective!=='first-person';
     this.placeRover(s.rover,Math.PI/2-(s.rover.occupied?s.player.heading:0));
     const travel=this.lastActorPosition?Math.hypot(this.player.position.x-this.lastActorPosition.x,this.player.position.z-this.lastActorPosition.z):0;
     if(this.physical&&s.moving&&!s.rover.occupied&&!s.training?.inside&&this.lastFootPosition){const before=this.lastFootPosition,len=Math.hypot(s.player.x-before.x,s.player.y-before.y)*this.mission.terrain.cell;if(len<30)for(let d=.65;d<=len;d+=.65){const f=d/len,side=(this.footprintCursor%2?1:-1)*.1/this.mission.terrain.cell,p={x:before.x+(s.player.x-before.x)*f-Math.sin(s.player.heading)*side,y:before.y+(s.player.y-before.y)*f+Math.cos(s.player.heading)*side},matrix=new THREE.Matrix4().compose(this.world(p,.004*this.unitsPerMetre),this.mission.config.world==='moon'?footprintRotation(this.mission.terrain,p,s.player.heading):new THREE.Quaternion().setFromAxisAngle(new V(0,1,0),Math.PI/2-s.player.heading),new V(this.unitsPerMetre,this.unitsPerMetre,this.unitsPerMetre));this.footprints.setMatrixAt(this.footprintCursor++%768,matrix);this.footprints.count=Math.min(768,this.footprintCursor);this.footprints.instanceMatrix.needsUpdate=true;}const used=Math.floor(len/.65)*.65;if(len<30&&used>0)this.lastFootPosition={x:before.x+(s.player.x-before.x)*used/len,y:before.y+(s.player.y-before.y)*used/len};else if(len>=30)this.lastFootPosition={...s.player};}else this.lastFootPosition={...s.player};
-    if(s.moving&&!this.reducedMotion&&travel<6)this.stepPhase+=travel*2.45;
+    // Longer, slower strides in low gravity; legs stop cycling while airborne.
+    if(s.moving&&!this.reducedMotion&&travel<6&&!s.player.jump)this.stepPhase+=travel*2.45*gait.strideFactor;
     this.lastActorPosition=this.player.position.clone();
     const desired=s.moving&&!s.rover.occupied?1:0;this.gaitStrength=dt?((this.gaitStrength||0)+(desired-(this.gaitStrength||0))*(1-Math.exp(-dt*9))):desired;
     this.poseAstronaut(this.player,this.stepPhase,time,this.gaitStrength);
@@ -453,13 +462,23 @@ export class Renderer {
       this.particles.push({mesh:m,v:new V((rng()-.5)*5,1+rng()*5,(rng()-.5)*5).multiplyScalar(this.unitsPerMetre),age:0,life:1+rng()*1.2});
     }
   }
+  // A small ring of dust where the boots land after a hop.
+  landingDust(point){
+    if(this.reducedMotion||!this.physical)return;const g=this.mission.config.physics.surfaceGravityMetresPerSecondSquared||1.62;
+    for(let i=0;i<10;i++){const a=i/10*Math.PI*2,m=mesh(this.fxGroup,new THREE.IcosahedronGeometry(.02*this.unitsPerMetre,0),this.mat.rock,this.world(point,.03*this.unitsPerMetre).toArray());m.castShadow=false;
+      this.particles.push({mesh:m,v:new V(Math.cos(a)*.6,.45,Math.sin(a)*.6).multiplyScalar(this.unitsPerMetre),age:0,life:Math.min(1.4,2*.45/g+.05)});}
+  }
   updateFX(dt) {
     const s=this.mission.state;
     if(s.moving&&!this.reducedMotion&&this.frameTime-(this.lastDust||0)>.12){
       this.lastDust=this.frameTime;const m=mesh(this.fxGroup,new THREE.IcosahedronGeometry(this.physical?.018*this.unitsPerMetre:.13,0),this.mat.rock,this.world(s.player,this.physical?.04*this.unitsPerMetre:.18).toArray());m.castShadow=false;
-      this.particles.push({mesh:m,v:new V(Math.sin(this.stepPhase)*.35,.5,-.15).multiplyScalar(this.unitsPerMetre),age:0,life:.55});
+      // Kicked dust flies on a ballistic arc: it stays up for 2·v/g (longer on the Moon).
+      const g=this.mission.config.physics.surfaceGravityMetresPerSecondSquared||1.62;
+      this.particles.push({mesh:m,v:new V(Math.sin(this.stepPhase)*.35,.5,-.15).multiplyScalar(this.unitsPerMetre),age:0,life:Math.min(1.4,Math.max(.3,2*.5/g+.05))});
     }
-    for(const p of [...this.particles]){p.age+=dt;p.v.y-=dt*(this.mission.config.physics.surfaceGravityMetresPerSecondSquared||1.62)*this.unitsPerMetre;p.mesh.position.addScaledVector(p.v,dt);p.mesh.scale.setScalar(Math.max(.03,1-p.age/p.life));if(p.age>=p.life){this.fxGroup.remove(p.mesh);p.mesh.geometry.dispose();this.particles.splice(this.particles.indexOf(p),1);}}
+    // No air on the Moon: dust keeps its speed until it lands. On Mars the thin air slows it a little.
+    const g=this.mission.config.physics.surfaceGravityMetresPerSecondSquared||1.62,drag=this.mission.config.world==='mars'?Math.exp(-dt*.9):1;
+    for(const p of [...this.particles]){p.age+=dt;p.v.multiplyScalar(drag);p.v.y-=dt*g*this.unitsPerMetre;p.mesh.position.addScaledVector(p.v,dt);p.mesh.scale.setScalar(Math.max(.03,1-p.age/p.life));if(p.age>=p.life){this.fxGroup.remove(p.mesh);p.mesh.geometry.dispose();this.particles.splice(this.particles.indexOf(p),1);}}
   }
   drawMini(canvas,life) {this.maps.assistedRoute=this.assistedRoute;this.maps.drawMini(canvas,life);}
   draw(time=0,life=null) {
@@ -473,7 +492,13 @@ export class Renderer {
         const heading=this.mission.state.player.heading,direction=this.perspective==='first-person'?this.camera.getWorldDirection(new V()):new V(Math.cos(heading),-.12,Math.sin(heading)).normalize();
         this.suitLamp.target.position.copy(this.suitLamp.position).addScaledVector(direction,12*this.unitsPerMetre);
       }
+      // Weather: the sky resets sun and fog every frame, so the weather scales them on top.
+      if(this.weather&&!this.skyOnly){
+        const w=this.weather.update(dt,this.camera,{groundY:this.world(this.mission.state.player).y,reducedMotion:this.reducedMotion});
+        this.sun.intensity*=w.sun;if(this.scene.fog?.isFogExp2)this.scene.fog.density=Math.max(this.scene.fog.density*w.haze,w.fogDensity);this.weatherFlash=w.flash;
+      }
     }
+    if(this.weather)this.weather.group.visible=!this.skyOnly;
     this.scene.updateMatrixWorld(true);this.device.render(this.scene,this.camera);
   }
   cinematicFrame(elapsed,shot) {
@@ -553,3 +578,4 @@ export class Renderer {
     for(const g of geometries)g.dispose();for(const t of textures)t.dispose();this.surfaceSamples=null;this.orbitTexture?.dispose();this.device.dispose();
   }
 }
+ 
