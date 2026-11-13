@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { createLunaServer, PROJECT_ROOT } from '../server.mjs';
 import { registerDatasets, currentManifest, validateDataset, DATA_FILES } from '../datasets.mjs';
 import { LocalStore } from '../store.mjs';
@@ -49,6 +48,8 @@ test('API refuses foreign origins, non-JSON writes and non-LUNA save keys', asyn
   assert.equal((await fetch(base + '/backend/data/state.json')).status, 404);
 });
 
+<<<<<<< HEAD
+=======
 test('static serving refuses symlinks that escape the served project tree', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'luna-static-'));
   const secret = path.join(directory, 'private.txt');
@@ -63,6 +64,7 @@ test('static serving refuses symlinks that escape the served project tree', asyn
   assert.equal((await fetch(base + '/workspace')).status, 200);
 });
 
+>>>>>>> origin/main
 test('validation publishes an immutable version, retains old objects and rejects invalid packs', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'luna-packs-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));

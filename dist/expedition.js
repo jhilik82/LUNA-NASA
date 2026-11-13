@@ -12,7 +12,11 @@ export function simulateOutpost(original,seconds,rules,{inside=true,sunlit=true}
  const h=step/3600,lifeFraction=clamp(o.lifeKw/rules.lifeMinimumKw,0,1),powered=p.net>=0||o.energy>1e-8;
  o.energy=clamp(o.energy+p.net*h,0,60);o.oxygen=Math.max(0,o.oxygen-(rules.crew+(o.leak?rules.leakCrewHoursPerHour:0))*h);
  o.water=Math.max(0,o.water-rules.crew*rules.waterLitresPerCrewHour*h-(o.foodKw>2?.22*(o.foodKw-2)*h:0));
- o.food=Math.max(0,o.food-rules.crew*rules.foodPortionsPerCrewHour*h+(o.foodKw>2?(o.foodKw-2)*.05*h:0));
+ o.food=Math.max(0,o.food-rules.crew*rules.foodPortionsPerCrewHour*h);
+ // Accelerated crop cycle is a teaching rule, never a claim about real plant growth.
+ o.growthHours=(o.growthHours||0)+(powered&&o.water>0?Math.max(0,o.foodKw-1)*h:0);
+ const harvest=Math.floor((o.growthHours+1e-9)/(rules.cropCycleHours||6));
+ if(harvest){o.food+=harvest*(rules.cropHarvestPortions||2);o.growthHours=Math.max(0,o.growthHours-harvest*(rules.cropCycleHours||6));o.harvests=(o.harvests||0)+harvest;}
  const shield=inside?(o.shield==='active'&&powered?.06:o.shield==='passive'?.18:.55):1,dose=o.radiationRate*h*shield;
  o.radiation+=dose;o.health=clamp(o.health-dose*rules.radiationHealthLossPerMsv-(!powered?16*h:0)-(1-lifeFraction)*12*h-(o.oxygen<=0?30*h:0),0,100);
  o.fatigue=clamp(o.fatigue+(inside?-2:7*o.suitFactor)*h,0,100);o.habitat=clamp(o.habitat-(o.leak?3*h:0)-o.dust*.5*h,0,100);
@@ -36,11 +40,15 @@ export class ExpeditionMission extends TrainingMission {
  get courseComplete(){return this.state.status==='complete';}
  save(){if(!this.scenario)return;}
  loadLevel(index){return this.scenario?false:super.loadLevel(index);}
+ // Later expedition stages get harder circuits (power stage 4×4, relay stage 5×5).
+ circuitDifficulty(){return 2+Math.round(this.state.expedition.stage*.75);}
+ // The start of an expedition stage is its checkpoint.
+ restartLevel(){if(this.checkpoint){this.replayCheckpoint();return true;}this.reset();return true;}
  newExpedition(){
   this.objects=copy(this.original.objects);this.science=copy(this.original.science).slice(0,1);this.science[0].name=this.config.world==='moon'?'BASALT SAMPLE':'JEZERO SCIENCE';
   // Keep the practical sample reachable without a multi-kilometre detour.
   const path=this.terrain.route(this.objects.base,this.objects.relay,this.config.walkMaxSlopeDegrees);this.science[0]={...path.path[Math.min(path.path.length-1,Math.floor(path.path.length*.72))],id:0,name:this.science[0].name};
-  Mission.prototype.reset.call(this);this.state.training={inside:false,phase:'expedition',inspected:[],drill:null};this.state.phase='expedition';this.state.expedition={stage:0,taskDone:false,taskPhase:0,decisions:[],outpost:copy(this.scenario.initial),lastChange:'Preflight inventory loaded.',minutes:0};
+  Mission.prototype.reset.call(this);this.state.training={inside:false,phase:'expedition',inspected:[],drill:null};this.state.phase='expedition';this.state.expedition={stage:0,taskDone:false,taskPhase:0,decisions:[],outpost:copy(this.scenario.initial),lastChange:'Preflight inventory loaded.',minutes:0,messages:[],askedStages:[],guideReadStages:[],revision:0};
   Object.assign(this.state.rover,{x:this.objects.base.x+2,y:this.objects.base.y,repaired:true,wh:this.config.rover.capacityWh});this.state.relayOnline=false;this.envelopeCache=null;this.checkpoint=null;this.checkpointUTC=null;
  }
  reset(){if(!this.scenario)return super.reset();this.newExpedition();}
@@ -59,7 +67,7 @@ export class ExpeditionMission extends TrainingMission {
   if(this.state.status!=='playing')return;const near=this.nearby();if(!near){this.notify('Follow the gold objective. Use Go to objective or WASD, then E beside the equipment.');return;}
   if(near.type==='expedition'){
    this.route=null;if(this.stage.location==='base')this.state.training.inside=true;
-   if(this.stage.task==='circuit'&&!this.state.expedition.taskDone){this.repairType=this.stage.location==='relay'?'relay':'outpost';this.circuit=new Circuit(this.config.seed+this.state.expedition.stage*31,this.repairType);this.state.status='repair';this.events.push({type:'repair'});}
+   if(this.stage.task==='circuit'&&!this.state.expedition.taskDone){this.repairType=this.stage.location==='relay'?'relay':'outpost';this.circuit=new Circuit(this.config.seed+this.state.expedition.stage*31,this.repairType,this.circuitDifficulty(this.repairType));this.state.status='repair';this.events.push({type:'repair'});}
    else this.events.push({type:'decision'});return;
   }super.interact();
  }
@@ -92,29 +100,52 @@ export class ExpeditionMission extends TrainingMission {
  }
  sunlit(){return this.astroWorld?this.astroWorld.apparent('Sun',this.astroWorld.observer(this.config.world,this.terrain.geo(this.state.player))).altitude>0:true;}
  preview(option){
-  const e=this.state.expedition;if(!option)return null;const next=applyEffects(e.outpost,option.effects),outpost=simulateOutpost(next,option.minutes*60,this.rules,{inside:this.stage.location==='base',sunlit:this.sunlit()});
-  return {outpost,power:powerBalance(outpost,this.sunlit()),failure:resourceFailure(outpost),minutes:option.minutes};
+  if(!option||!Number.isFinite(option.minutes)||option.minutes<0)return null;
+  const s=copy(this.state),e=s.expedition,before=copy(e.outpost),inside=this.stage.location==='base';
+  e.outpost=applyEffects(e.outpost,option.effects);
+  if(option.effects.suitOxygen)s.oxygen=Math.min(this.config.suit.oxygenMinutes,s.oxygen+option.effects.suitOxygen);
+  if(option.effects.suitEnergy)s.suitWh=clamp(s.suitWh+option.effects.suitEnergy,0,this.config.suit.batteryWh);
+  this.advanceState(s,option.minutes*60,inside);
+  return {state:s,before,outpost:e.outpost,power:powerBalance(e.outpost,this.sunlit()),failure:resourceFailure(e.outpost,this.sunlit())||(s.oxygen<=0?'Suit oxygen exhausted':s.suitWh<=0?'Suit battery exhausted':s.water<=0?'Suit water exhausted':null),minutes:option.minutes,
+   suit:{oxygen:s.oxygen,energy:s.suitWh,water:s.water},delta:Object.fromEntries(['energy','oxygen','water','food','health','science','kits','fuel'].map(k=>[k,e.outpost[k]-before[k]]))};
  }
- choose(id){
+ choose(id,expectedStage=this.state.expedition.stage){
   const s=this.state,e=s.expedition,stage=this.stage,option=stage.options.find(x=>x.id===id);
-  if(!['playing','paused'].includes(s.status)||!this.atTarget()||!e.taskDone||!option||Object.entries(option.effects).some(([k,v])=>['kits','fuel','water','oxygen','energy'].includes(k)&&typeof v==='number'&&e.outpost[k]+v<0))return false;
-  e.outpost=applyEffects(e.outpost,option.effects);if(option.effects.suitOxygen)s.oxygen+=option.effects.suitOxygen;if(option.effects.suitEnergy)s.suitWh=Math.max(0,s.suitWh+option.effects.suitEnergy);
-  this.consumeTime(option.minutes*60,stage.location==='base');e.decisions.push({stage:stage.id,title:stage.title,choice:id,label:option.label,effects:copy(option.effects),minutes:option.minutes,time:s.time});e.lastChange=option.label+'. '+option.explanation;
+  if(expectedStage!==e.stage||!['playing','paused'].includes(s.status)||!this.atTarget()||!e.taskDone||!option||Object.entries(option.effects).some(([k,v])=>['kits','fuel','water','oxygen','energy'].includes(k)&&typeof v==='number'&&e.outpost[k]+v<0))return false;
+  const result=this.preview(option);
+  e.outpost=result.outpost;s.oxygen=result.suit.oxygen;s.suitWh=result.suit.energy;s.water=result.suit.water;s.time=result.state.time;e.minutes=s.time/60;
+  e.messages=result.state.expedition.messages;
+  e.decisions.push({stage:stage.id,title:stage.title,choice:id,label:option.label,effects:copy(option.effects),minutes:option.minutes,time:s.time,before:result.before,after:copy(e.outpost),delta:result.delta});e.lastChange=option.label+'. '+option.explanation;e.revision=(e.revision||0)+1;
   this.record('decision',option.label,{effects:copy(option.effects),minutes:option.minutes});this.notify(option.explanation,'success');e.stage++;e.taskDone=false;e.taskPhase=0;this.envelopeCache=null;
   if(e.stage<this.scenario.stages.length){const hazard=this.stage.hazard;if(hazard){if(hazard.radiation!==undefined)e.outpost.radiationRate=hazard.radiation;if(hazard.dust!==undefined)e.outpost.dust=hazard.dust;this.record('scenario-event',this.stage.description);}
    if(this.stage.location!=='base')s.training.inside=false;if(this.stage.id==='science')s.training.drill=null;s.phase=this.stage.id;s.status='playing';this.saveCheckpoint();
   }else this.finishExpedition();this.checkFailure();return true;
  }
- consumeTime(seconds,inside){
-  const s=this.state,e=s.expedition;e.outpost=simulateOutpost(e.outpost,seconds,this.rules,{inside,sunlit:this.sunlit()});s.time+=seconds;e.minutes=s.time/60;
-  if(!inside){const factor=e.outpost.suitFactor;s.oxygen=Math.max(0,s.oxygen-seconds/60*factor);s.suitWh=Math.max(0,s.suitWh-seconds/3600*this.config.suit.idleWatts);s.water=Math.max(0,s.water-seconds/3600*this.config.suit.waterLitresPerHour);}
+ advanceState(s,seconds,inside,{consumeSuit=true}={}){
+  if(!Number.isFinite(seconds)||seconds<0)throw Error('Mission time must be finite and non-negative.');
+  const e=s.expedition;e.outpost=simulateOutpost(e.outpost,seconds,this.rules,{inside,sunlit:this.sunlit()});s.time+=seconds;e.minutes=s.time/60;
+  if(!inside&&consumeSuit){const factor=e.outpost.suitFactor;s.oxygen=Math.max(0,s.oxygen-seconds/60*factor);s.suitWh=Math.max(0,s.suitWh-seconds/3600*this.config.suit.idleWatts);s.water=Math.max(0,s.water-seconds/3600*this.config.suit.waterLitresPerHour);}
+  for(const message of e.messages||[])if(s.time>=message.due)message.delivered=true;
  }
+ consumeTime(seconds,inside){this.advanceState(this.state,seconds,inside);}
+ earthDelay(){
+  if(this.astroWorld){const earth=this.astroWorld.position('Earth'),site=this.astroWorld.observer(this.config.world,this.terrain.geo(this.state.player));return Math.hypot(earth.x-site.position.x,earth.y-site.position.y,earth.z-site.position.z)/299792.458;}
+  return this.config.world==='moon'?1.3:720;
+ }
+ askEarth(){
+  const s=this.state,e=s.expedition,cost=this.rules.earthMessageEnergyKwh||.15;
+  if(!['playing','paused'].includes(s.status)||e.askedStages.includes(e.stage)||e.outpost.energy<cost)return false;
+  const delay=this.earthDelay();e.outpost.energy-=cost;e.askedStages.push(e.stage);
+  e.messages.push({stage:e.stage,sent:s.time,due:s.time+2*delay,oneWay:delay,cost,delivered:false,text:'Earth to Haven: '+this.stage.options[0].explanation+' Check the forecast against your current reserves; this reply describes the situation when you sent it.'});
+  e.revision=(e.revision||0)+1;this.record('earth-message','Earth advice requested. Round-trip light time '+(2*delay).toFixed(1)+' mission seconds; '+cost+' kWh transmission cost.');this.saveCheckpoint();return true;
+ }
+ acknowledgeGuide(){const e=this.state.expedition;if(!e.guideReadStages.includes(e.stage))e.guideReadStages.push(e.stage);}
  update(dt,input={}){
   if(!this.scenario)return super.update(dt,input);if(this.state.status!=='playing')return;
   const s=this.state,old=s.time,oxy=s.oxygen,wh=s.suitWh,water=s.water;if(input.dx||input.dy||this.route)s.training.inside=false;super.update(dt,input);
   const elapsed=s.time-old,inside=s.training.inside,e=s.expedition;
   if(inside){s.oxygen=oxy;s.suitWh=wh;s.water=water;}else s.oxygen=Math.max(0,s.oxygen-(oxy-s.oxygen)*(e.outpost.suitFactor-1));
-  e.outpost=simulateOutpost(e.outpost,elapsed,this.rules,{inside,sunlit:this.sunlit()});e.minutes=s.time/60;this.checkFailure();
+  s.time=old;this.advanceState(s,elapsed,inside,{consumeSuit:false});this.checkFailure();
  }
  checkFailure(){
   const s=this.state;if(s.status==='failed'||s.status==='complete')return;const reason=resourceFailure(s.expedition.outpost,this.sunlit())|| (s.oxygen<=0?'EVA oxygen exhausted':s.suitWh<=0?'EVA battery exhausted':s.water<=0?'Suit water exhausted':null);
@@ -151,12 +182,12 @@ export class ExpeditionMission extends TrainingMission {
  hasSavedCheckpoint(){const s=readPreference(this.saveKey,null,this.expeditionStorage);return s?.schema===2&&s.scenario===this.scenario.id&&s.state?.expedition?.stage>=0&&s.state.expedition.stage<7;}
  replayCheckpoint(){
   const record=readPreference(this.saveKey,null,this.expeditionStorage),saved=this.checkpoint|| (this.hasSavedCheckpoint()?record.state:null);if(!saved)return false;
-  if(!Object.values(saved.expedition.outpost).every(x=>typeof x!=='number'||Number.isFinite(x)))return false;this.state=copy(saved);this.state.status='playing';this.route=null;this.circuit=null;this.events=[{type:'replayed'}];this.envelopeCache=null;if(this.astroWorld&&Number.isFinite(record?.utc)){this.astroWorld.setMissionUTC(record.utc);this.utcStart=record.utc-this.state.time;}return true;
+  if(!Object.values(saved.expedition.outpost).every(x=>typeof x!=='number'||Number.isFinite(x)))return false;this.state=copy(saved);Object.assign(this.state.expedition,{messages:saved.expedition.messages||[],askedStages:saved.expedition.askedStages||[],guideReadStages:saved.expedition.guideReadStages||[],revision:saved.expedition.revision||0});this.state.expedition.outpost.growthHours??=0;this.state.expedition.outpost.harvests??=0;this.state.status='playing';this.route=null;this.circuit=null;this.events=[{type:'replayed'}];this.envelopeCache=null;if(this.astroWorld&&Number.isFinite(record?.utc)){this.astroWorld.setMissionUTC(record.utc);this.utcStart=record.utc-this.state.time;}return true;
  }
  debrief(){const s=this.state,o=s.expedition.outpost,f=s.expedition.forecast||this.forecast();return {success:s.status==='complete',rank:this.rank,lesson:this.lesson,badge:this.scenario.badge,score:this.xp,learning:f.safe?'Your plan preserves four hours of essential reserves.':'Review the energy, oxygen and shielding costs before retrying.',decisions:copy(s.expedition.decisions),outpost:copy(o),forecast:f,minutes:s.time/60,distanceKm:s.distanceMetres/1000,oxygenPercent:s.oxygen/this.config.suit.oxygenMinutes*100,science:o.science,repairs:s.repairs};}
  astra(question='next'){
   if(!this.scenario)return super.astra(question);const q=question.toLowerCase(),s=this.state,o=s.expedition.outpost,p=powerBalance(o,this.sunlit()),f=this.forecast();
-  if(/shield/.test(q)){const active=this.forecast(1,{...o,shield:'active',shieldKw:3}),passive=this.forecast(1,{...o,shield:'passive',shieldKw:0});return 'One-hour forecast: active shielding uses 3.0 kW extra; battery ends at '+active.final.energy.toFixed(1)+' kWh and habitat dose rises '+(active.final.radiation-o.radiation).toFixed(2)+' mSv. Passive shielding ends at '+passive.final.energy.toFixed(1)+' kWh and adds '+(passive.final.radiation-o.radiation).toFixed(2)+' mSv. These are calculated teaching rates. You choose the plan.';}
+  if(/shield/.test(q)){const active=this.forecast(1,{...o,shield:'active',shieldKw:3}),passive=this.forecast(1,{...o,shield:'passive',shieldKw:0});return 'Experimental concept, not flight-ready hardware. Illustrative one-hour forecast: powered shielding uses 3.0 kW extra; battery ends at '+active.final.energy.toFixed(1)+' kWh and habitat dose rises '+(active.final.radiation-o.radiation).toFixed(2)+' mSv. Passive shielding ends at '+passive.final.energy.toFixed(1)+' kWh and adds '+(passive.final.radiation-o.radiation).toFixed(2)+' mSv. These are calculated teaching rates. You choose the plan.';}
   if(/why.*power|power.*(drop|decreas)|energy/.test(q))return 'Supply '+p.supply.toFixed(2)+' kW, demand '+p.demand.toFixed(2)+' kW; balance '+p.net.toFixed(2)+' kW. Battery '+o.energy.toFixed(1)+' kWh. Dust optical depth '+o.dust.toFixed(2)+' attenuates the array; shielding uses '+o.shieldKw.toFixed(1)+' kW. '+s.expedition.lastChange;
   if(/surviv|resupply|water|food/.test(q))return 'Calculated '+f.hours+'-hour resupply forecast: '+(f.safe?'essential reserves hold.':'the plan is unsafe: '+(f.failure||'health or habitat margin is too low')+'.')+' Oxygen '+f.final.oxygen.toFixed(1)+' crew-hours; water '+f.final.water.toFixed(1)+' L; food '+f.final.food.toFixed(1)+' portions; energy '+f.final.energy.toFixed(1)+' kWh; health '+f.final.health.toFixed(0)+'%. Assumes the current daylight and operating plan continue.';
   if(/safe|eva|oxygen|reserve|lifeline/.test(q)){const e=this.evaAt(this.target());return 'EVA estimate to '+this.target().name+': '+e.status.toUpperCase()+'. Outward '+e.outboundMinutes?.toFixed(1)+' min, return '+e.returnMinutes.toFixed(1)+' min, plus 5 min field work. Need '+e.oxygenNeed?.toFixed(1)+' min oxygen including 20 min reserve; suit has '+s.oxygen.toFixed(1)+' min. Need '+e.energyNeed?.toFixed(0)+' Wh; suit has '+s.suitWh.toFixed(0)+' Wh. Limiting factor: '+e.reason+'.';}

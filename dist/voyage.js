@@ -32,7 +32,7 @@ export function daylightDeparture(world,destination){
 export class FlightSimulation{
  constructor(data,world=null){this.data=data;this.world=world;this.departure='earth';this.localSortie=false;this.departureUTC=world?Date.parse(world.data.epoch)/1000:null;if(world)world.spacecraft=this;this.cabinFlight=false;this.flightEvent={resolved:false,choice:null};this.phase='briefing';this.destination='moon';this.select('moon');this.paused=false;this.flightCount=0;}
  get active(){return this.phase!=='surface';}
- select(destination){if(this.phase!=='briefing')return false;this.departure='earth';this.localSortie=false;this.departureUTC=this.world?daylightDeparture(this.world,destination):null;this.destination=destination;this.plan=makeFlightPlan(this.data,destination,this.world,this.departureUTC);this.flightEvent={resolved:false,choice:null};this.elapsed=0;this.simSeconds=0;this.routeProgress=0;this.speedLocked=null;this.angleLocked=null;this.attempts=0;return true;}
+ select(destination){if(this.phase!=='briefing')return false;this.departure='earth';this.localSortie=false;this.departureUTC=this.world?daylightDeparture(this.world,destination):null;this.destination=destination;this.plan=makeFlightPlan(this.data,destination,this.world,this.departureUTC);this.flightEvent={resolved:false,choice:null};this.elapsed=0;this.simSeconds=0;this.routeProgress=0;this.speedLocked=null;this.angleLocked=null;this.assistedSpeed=this.assistedAngle=null;this.attempts=0;return true;}
  startLocalSortie(destination,geo){
   if(!this.world||!['surface','landed'].includes(this.phase)||!['moon','mars'].includes(destination))return false;
   const b=WORLDS[destination],radiusKm=this.world.data.bodies[b.name].radiusKm+400,mu=b.gravity*(b.radiusKm*1000)**2,period=2*Math.PI*Math.sqrt((radiusKm*1000)**3/mu),departureUTC=this.world.utc;
@@ -40,9 +40,11 @@ export class FlightSimulation{
   this.departure=destination;this.destination=destination;this.departureUTC=departureUTC;this.localSortie=true;this.localGeo={...geo};
   const path=u=>{const t=departureUTC+600+period*u,site=this.world.observer(destination,this.localGeo,t),normal=add(vec(),site.basis[2],Math.cos(u*Math.PI*2));return add(this.world.position(b.name,t),add(normal,site.basis[0],Math.sin(u*Math.PI*2)),radiusKm);};
   const orbitKm=2*Math.PI*radiusKm;this.plan={destination,separationKm:0,totalKm:orbitKm+800,durationSeconds:period,path,distance:u=>400+orbitKm*u,epoch:new Date(departureUTC*1000).toISOString(),earth:this.world.position(b.name),target:this.world.position(b.name),classification:'Illustrative circular body-fixed training orbit; period calculated from surface gravity and radius. Not an orbital propagation solution.'};
-  this.flightEvent={resolved:false,choice:null};this.simSeconds=0;this.routeProgress=0;this.speedLocked=this.angleLocked=null;this.attempts=0;this.paused=false;this.enter('boarding');return true;
+  this.flightEvent={resolved:false,choice:null};this.simSeconds=0;this.routeProgress=0;this.speedLocked=this.angleLocked=null;this.assistedSpeed=this.assistedAngle=null;this.attempts=0;this.paused=false;this.enter('boarding');return true;
  }
+ setLandingTarget(kind,value){if(!['speed','angle'].includes(this.phase)||!Number.isFinite(value))return false;if(kind==='speed'&&this.phase==='speed')this.assistedSpeed=clamp(value,0,12);else if(kind==='angle'&&this.phase==='angle')this.assistedAngle=clamp(value,-15,15);else return false;return true;}
  enter(phase){this.phase=phase;this.elapsed=0;}
+
  board(){if(this.phase!=='briefing')return false;this.enter('boarding');return true;}
  launch(){if(this.phase!=='cockpit')return false;this.flightCount++;this.enter('ignition');return true;}
  lock(){
@@ -54,7 +56,7 @@ export class FlightSimulation{
    this.enter(safe?'descent':'go-around');return true;
   }return false;
  }
- resolveEvent(choice){if(this.phase!=='transfer'||!['isolate','backup'].includes(choice)||this.flightEvent.resolved)return false;this.flightEvent={resolved:true,choice};return true;}
+ resolveEvent(choice){if(this.phase!=='transfer'||!['isolate','backup'].includes(choice)||this.flightEvent.resolved)return false;this.flightEvent={resolved:true,choice,at:this.elapsed};return true;} 
  skipSegment(){const next={boarding:'cockpit',ascent:'transfer',transfer:'capture',capture:'speed'}[this.phase];if(!next)return false;if(this.phase==='transfer'&&!this.flightEvent.resolved)return false;if(this.phase==='ascent')this.simSeconds=600;if(this.phase==='transfer'){this.simSeconds=600+this.plan.durationSeconds;this.routeProgress=1;}if(this.phase==='capture')this.simSeconds=800+this.plan.durationSeconds;this.enter(next);return true;}
  observerState(){
   if(!this.world)return null;const a=this.world,p=this.phase,w=WORLDS[this.destination],t=this.telemetry(),utc=a.utc,frame=[vec(1,0,0),vec(0,1,0),vec(0,0,1)];let position;
@@ -63,7 +65,7 @@ export class FlightSimulation{
   if(p==='transfer')position=this.plan.path(this.routeProgress);else{const site=a.observer(this.destination);position=add(site.position,site.basis[2],t.altitudeM/1000);return {...site,position};}
   return {world:'space',host:null,position,velocity:a.velocity('Earth'),basis:frame,geo:null};
  }
- get gauges(){return{speed:this.speedLocked??wave(this.elapsed,4.8,0,12),angle:this.angleLocked??wave(this.elapsed+1.15,5.6,-15,15)};}
+ get gauges(){return{speed:this.speedLocked??this.assistedSpeed??wave(this.elapsed,4.8,0,12),angle:this.angleLocked??this.assistedAngle??wave(this.elapsed+1.15,5.6,-15,15)};}
  update(dt,hidden=false){
   if(hidden||this.paused||!this.active)return;dt=clamp(dt,0,.1);this.elapsed+=dt;
   if(this.world&&this.phase==='transfer'&&this.elapsed>=12&&!this.flightEvent.resolved){this.elapsed=12;this.routeProgress=.5;this.simSeconds=600+this.plan.durationSeconds*.5;return;}
@@ -72,7 +74,7 @@ export class FlightSimulation{
   else if(this.phase==='ascent'){this.simSeconds=600*clamp(this.elapsed/18,0,1);if(this.elapsed>=18)this.enter('transfer');}
   else if(this.phase==='transfer'){this.routeProgress=clamp(this.elapsed/24,0,1);this.simSeconds=600+this.plan.durationSeconds*this.routeProgress;if(this.elapsed>=24)this.enter('capture');}
   else if(this.phase==='capture'){this.simSeconds=600+this.plan.durationSeconds+200*clamp(this.elapsed/8,0,1);if(this.elapsed>=8){this.routeProgress=1;this.enter('speed');}}
-  else if(this.phase==='go-around'&&this.elapsed>=5){this.speedLocked=this.angleLocked=null;this.enter('speed');}
+  else if(this.phase==='go-around'&&this.elapsed>=5){this.speedLocked=this.angleLocked=null;this.assistedSpeed=this.assistedAngle=null;this.enter('speed');}
   else if(this.phase==='descent'){this.simSeconds=800+this.plan.durationSeconds+(160/this.speedLocked)*clamp(this.elapsed/12,0,1);if(this.elapsed>=12)this.enter('landed');}
  }
  telemetry(){

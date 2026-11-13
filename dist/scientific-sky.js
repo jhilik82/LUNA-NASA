@@ -68,9 +68,11 @@ export class ScientificSurfaceSky extends ScientificSky {
  update(){
   const view=super.update(),r=this.r,day=view.sun.altitude>0,mars=this.destination==='mars',u=r.unitsPerMetre;
   r.skySunDirection=vec(view.sun.direction);r.sun.color.set(mars?'#fff1dc':'#fffaf2');r.sun.intensity=day?(mars?2.2:3.7)*Math.exp(-view.dust*.5):0;
-  this.fill.color.set(mars?(day?'#e2c7aa':'#bac7d8'):'#c5c3be');this.fill.groundColor.set(mars?'#322821':'#46443f');this.fill.intensity=mars?(day?.72:.065):(day?.036:.016);
-  r.scene.background.set(mars?'#000103':'#000000');r.scene.fog=mars?new THREE.FogExp2(day?'#bb9474':'#090c13',(.00013+view.dust*.00010)/u):null;
-  r.device.toneMappingExposure=Math.pow(2,this.world.exposure)*(mars?1.1:1.06);r.updateSun();if(r.suitLamp)r.suitLamp.intensity=(day?(mars?8:.6):120)*u*u;
+  // Grading for play: physically the lunar night is near-black and sunlit shadows are pitch dark. Keep the look
+  // (dark, cool night; crisp day shadows) but give enough fill to read terrain, suits and equipment.
+  this.fill.color.set(mars?(day?'#efc9a2':'#9fb2cf'):(day?'#cfd3db':'#8ea3c4'));this.fill.groundColor.set(mars?'#4a2c1c':day?'#4a4844':'#2b3140');this.fill.intensity=mars?(day?.78:.22):(day?.16:.34);
+  r.scene.background.set(mars?'#000103':'#000000');if(mars){this.marsFog ||= new THREE.FogExp2('#c58f62',1);this.marsFog.color.set(day?'#c58f62':'#0b0f18');this.marsFog.density=(.00011+view.dust*.00010)/u;r.scene.fog=this.marsFog;}else r.scene.fog=null;
+  r.device.toneMappingExposure=Math.pow(2,this.world.exposure)*(mars?1.12:day?1.08:1.5);r.updateSun();if(r.suitLamp)r.suitLamp.intensity=(day?(mars?8:.6):120)*u*u;
   const earth=view.bodies.find(b=>b.name==='Earth');this.earthshine.intensity=!mars&&earth?.geometricVisible ? .001*earth.illuminated*(earth.diameterDeg/1.9)**2 : 0;
   this.earthshine.target.position.copy(r.world(r.mission.state.player));if(earth)this.earthshine.position.copy(this.earthshine.target.position).addScaledVector(vec(earth.direction),80);
   this.surfaceDust.visible=mars&&day&&!r.reducedMotion&&!r.skyOnly;this.surfaceDust.material.opacity=.012+Math.min(1,view.dust)*.025;

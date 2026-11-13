@@ -146,59 +146,149 @@ export class Terrain {
   }
 }
 
+// Circuit repair puzzle.
+// Wires point in 8 directions (N, NE, E, SE, S, SW, W, NW = 0..7) and each click turns a tile 45°, so a tile has
+// 8 positions instead of 4. Diagonal wires link to diagonal neighbours. The board is generated from the seed and
+// grows with difficulty (the level number): a bigger grid, a longer power path, more diagonal links, more branching
+// decoy tiles and fewer tiles that start already lined up.
 const CIRCUIT_DESIGNS = {
-  outpost: {
-    name: 'HAVEN · VERTICAL DISTRIBUTION BUS',
-    input: { index: 0, side: 0 }, output: { index: 8, side: 2 },
-    ports: [[0,1],[2,3],[0,2],[1,2],[0,3],[0,2],[0,1],[1,3],[2,3]]
-  },
-  relay: {
-    name: 'RELAY · SIGNAL BRIDGE',
-    input: { index: 3, side: 3 }, output: { index: 5, side: 1 },
-    ports: [[1,2],[1,3],[2,3],[0,3],[0,2],[0,1],[0,1],[0,3],[1,3]]
-  },
-  rover: {
-    name: 'ECHO · MOTOR POWER ROUTE',
-    input: { index: 6, side: 2 }, output: { index: 2, side: 0 },
-    ports: [[1,3],[0,2],[0,2],[1,2],[1,2],[0,3],[1,2],[0,3],[0,3]]
-  }
+  outpost: { name: 'HAVEN · DISTRIBUTION BUS' },
+  relay: { name: 'RELAY · SIGNAL BRIDGE' },
+  rover: { name: 'ECHO · MOTOR POWER ROUTE' }
 };
-const circuitSides = ['top','right','bottom','left'];
-const circuitDirections = ['up','right','down','left'];
-const circuitTileName = index => ['top','middle','bottom'][Math.floor(index / 3)]+'-'+['left','centre','right'][index % 3];
+export const CIRCUIT_DIRECTIONS = 8;
+const STEP = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]]; // dx, dy for ports 0..7
+const circuitSides = ['top','top-right','right','bottom-right','bottom','bottom-left','left','top-left'];
+const circuitDirections = ['up','up-right','right','down-right','down','down-left','left','up-left'];
+const ROW_NAMES = { 3: ['top','middle','bottom'], 4: ['top','second','third','bottom'], 5: ['top','second','middle','fourth','bottom'] };
+const COLUMN_NAMES = { 3: ['left','centre','right'], 4: ['left','second','third','right'], 5: ['left','second','centre','fourth','right'] };
+
+// Difficulty 0 is the first puzzle a player meets; every level adds to it.
+export function circuitSettings(difficulty = 1) {
+  const d = Math.max(0, Math.min(12, Math.round(Number(difficulty) || 0)));
+  const size = d < 2 ? 3 : d < 5 ? 4 : 5;
+  return {
+    difficulty: d, cols: size, rows: size,
+    minPath: 4 + Math.round(d * .6), maxPath: 6 + Math.round(d * .6), // tiles on the power path
+    diagonal: d === 0 ? 0 : Math.min(.65, .12 + d * .06),  // chance that a step of the power path is diagonal
+    branches: Math.min(.55, d * .06),                      // share of decoy tiles that are 3-way junctions
+    presolved: Math.max(0, .45 - d * .09)                  // share of path tiles that start already lined up
+  };
+}
 
 export class Circuit {
-  constructor(seed, design = null) {
-    // Each apparatus has its own solved path and external terminals. N/E/S/W = 0/1/2/3.
+  constructor(seed, design = null, difficulty = 1) {
     const rng = randomGenerator(seed);
     this.design = CIRCUIT_DESIGNS[design] ? design : Object.keys(CIRCUIT_DESIGNS)[Math.abs(Math.trunc(seed) || 0) % 3];
-    const layout = CIRCUIT_DESIGNS[this.design];
-    this.name = layout.name; this.input = {...layout.input}; this.output = {...layout.output};
-    this.ports = layout.ports.map(ports => [...ports]);
-    this.turns = this.ports.map(() => Math.floor(rng() * 4));
-    this.moves = 0;
-    while (this.connected()) this.turns[this.input.index] = (this.turns[this.input.index] + 1) % 4;
+    this.name = CIRCUIT_DESIGNS[this.design].name;
+    const settings = this.settings = circuitSettings(difficulty);
+    this.cols = settings.cols; this.rows = settings.rows; this.difficulty = settings.difficulty;
+    this.name += ' · LEVEL ' + (settings.difficulty + 1) + ' · ' + this.cols + '×' + this.rows;
+    for (let attempt = 0; attempt < 400 && !this.path; attempt++) this.generate(rng, settings);
+    if (!this.path) this.generate(rng, { ...settings, maxPath: Infinity });
+    this.moves = 0; this.shuffle(rng, settings.presolved);
   }
-  get instructions() { return 'Power enters the '+circuitSides[this.input.side]+' edge of the '+circuitTileName(this.input.index)+' tile. Rotate the wires to reach the OUTPUT at the '+circuitSides[this.output.side]+' edge of the '+circuitTileName(this.output.index)+' tile.'; }
-  hint() { return 'Start at the '+circuitTileName(this.input.index)+' tile: one wire must point '+circuitDirections[this.input.side]+' toward INPUT. Match wire ends on neighbouring tiles. Finish at the '+circuitTileName(this.output.index)+' tile with a wire pointing '+circuitDirections[this.output.side]+' toward OUTPUT. Glowing tiles have power; you do not need to power every tile.'; }
+  // Builds a random power path between two border tiles, then fills the other tiles with decoy wires.
+  generate(rng, { cols, rows, minPath, maxPath = Infinity, diagonal, branches }) {
+    const count = cols * rows, at = (x, y) => y * cols + x;
+    const borderSides = (x, y) => [y === 0 && 0, x === cols - 1 && 2, y === rows - 1 && 4, x === 0 && 6].filter(v => v !== false);
+    const pick = list => list[Math.floor(rng() * list.length)];
+    const border = []; for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (borderSides(x, y).length) border.push([x, y]);
+    const [sx, sy] = pick(border), inSide = pick(borderSides(sx, sy));
+    // Exit on a different edge of the board, far enough away.
+    const exits = border.filter(([x, y]) => Math.max(Math.abs(x - sx), Math.abs(y - sy)) >= Math.min(cols, rows) - 1);
+    const [ex, ey] = pick(exits), outSides = borderSides(ex, ey).filter(side => side !== inSide);
+    if (!outSides.length) return;
+    const outSide = pick(outSides);
+    // Random self-avoiding walk with backtracking; diagonal steps are allowed with the level's probability and
+    // never cross another diagonal step of the path, so every link is unambiguous.
+    const visited = new Set([at(sx, sy)]), path = [[sx, sy]], diagonals = new Set();
+    const crossKey = (x, y, d) => { const [dx, dy] = STEP[d]; return Math.min(x, x + dx) + ',' + Math.min(y, y + dy); };
+    let steps = 0;
+    const acute = (a, b) => Math.min((a - b + 8) % 8, (b - a + 8) % 8) === 1; // a 45° hairpin is hard to read
+    const back = () => { if (path.length < 2) return inSide; const [ax, ay] = path.at(-1), [bx, by] = path.at(-2); return STEP.findIndex(([dx, dy]) => dx === bx - ax && dy === by - ay); };
+    const walk = (x, y) => {
+      if (++steps > 4000) return false;
+      if (x === ex && y === ey) return path.length >= minPath;
+      if (path.length >= maxPath) return false;
+      const options = [];
+      for (let d = 0; d < 8; d++) {
+        const [dx, dy] = STEP[d], nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows || visited.has(at(nx, ny))) continue;
+        if (d % 2 && (rng() > diagonal || diagonals.has(crossKey(x, y, d)))) continue;
+        if (acute(d, back()) || (nx === ex && ny === ey && acute((d + 4) % 8, outSide))) continue;
+        options.push(d);
+      }
+      for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
+      for (const d of options) {
+        const [dx, dy] = STEP[d], nx = x + dx, ny = y + dy;
+        if (nx === ex && ny === ey && path.length + 1 < minPath) continue;
+        visited.add(at(nx, ny)); path.push([nx, ny]); if (d % 2) diagonals.add(crossKey(x, y, d));
+        if (walk(nx, ny)) return true;
+        visited.delete(at(nx, ny)); path.pop(); if (d % 2) diagonals.delete(crossKey(x, y, d));
+      }
+      return false;
+    };
+    if (!walk(sx, sy)) return;
+    const ports = Array.from({ length: count }, () => null);
+    path.forEach(([x, y], i) => {
+      const dirTo = ([ax, ay], [bx, by]) => STEP.findIndex(([dx, dy]) => dx === bx - ax && dy === by - ay);
+      const from = i === 0 ? inSide : (dirTo([x, y], path[i - 1]));
+      const to = i === path.length - 1 ? outSide : dirTo([x, y], path[i + 1]);
+      ports[at(x, y)] = [from, to];
+    });
+    // Decoys: copies of real wire shapes (so shape alone does not give the path away), some with a third branch.
+    const shapes = path.map((_, i) => { const [a, b] = ports[at(...path[i])]; return (b - a + 8) % 8; }).filter(gap => gap !== 0);
+    for (let i = 0; i < count; i++) if (!ports[i]) {
+      const a = Math.floor(rng() * 8), gap = pick(shapes.length ? shapes : [4]), tile = [a, (a + gap) % 8];
+      if (rng() < branches) { const free = [0,1,2,3,4,5,6,7].filter(p => !tile.includes(p) && (p - a + 8) % 8 !== 1 && (a - p + 8) % 8 !== 1); tile.push(pick(free)); }
+      ports[i] = tile;
+    }
+    this.ports = ports; this.path = path.map(([x, y]) => at(x, y));
+    this.input = { index: at(sx, sy), side: inSide }; this.output = { index: at(ex, ey), side: outSide };
+  }
+  // Turns every tile to a random position (keeping a share of path tiles lined up on easy levels); never solved.
+  shuffle(rng, presolved = 0) {
+    const keep = new Set(this.path.filter(i => i !== this.input.index && rng() < presolved));
+    this.turns = this.ports.map((_, i) => keep.has(i) ? 0 : Math.floor(rng() * 8));
+    let guard = 0;
+    while (this.connected() && guard++ < 64) this.turns[this.input.index] = (this.turns[this.input.index] + 1 + Math.floor(rng() * 6)) % 8;
+  }
+  tileName(index) {
+    const x = index % this.cols, y = Math.floor(index / this.cols);
+    const rows = ROW_NAMES[this.rows], cols = COLUMN_NAMES[this.cols];
+    return rows && cols ? rows[y] + '-' + cols[x] : 'row ' + (y + 1) + ', column ' + (x + 1);
+  }
+  get instructions() { return 'Power enters the ' + circuitSides[this.input.side] + ' edge of the ' + this.tileName(this.input.index) + ' tile. Turn the wires (45° per click) to reach the OUTPUT at the ' + circuitSides[this.output.side] + ' edge of the ' + this.tileName(this.output.index) + ' tile. Diagonal wires link to diagonal neighbours.'; }
+  hint() {
+    const next = this.path.find(i => !this.connections(i).includes(this.ports[i][0]) || !this.connections(i).includes(this.ports[i][1]));
+    const lead = 'Start at the ' + this.tileName(this.input.index) + ' tile: one wire must point ' + circuitDirections[this.input.side] + ' toward INPUT. ';
+    if (next === undefined) return lead + 'Every tile on the power path is lined up: apply the repair.';
+    const powered = this.powered();
+    return lead + (powered.size ? 'Power already flows through ' + powered.size + ' tile' + (powered.size === 1 ? '' : 's') + '. ' : '') + 'Next, turn the ' + this.tileName(next) + ' tile. Finish at the ' + this.tileName(this.output.index) + ' tile with a wire pointing ' + circuitDirections[this.output.side] + '. Right-click turns a tile back.';
+  }
   terminalPosition(endpoint) {
-    const row = Math.floor(endpoint.index / 3) + 2, column = endpoint.index % 3 + 2;
-    return {row: endpoint.side===0 ? 1 : endpoint.side===2 ? 5 : row, column: endpoint.side===3 ? 1 : endpoint.side===1 ? 5 : column};
+    const row = Math.floor(endpoint.index / this.cols) + 2, column = endpoint.index % this.cols + 2;
+    const side = endpoint.side;
+    return { row: side === 0 ? 1 : side === 4 ? this.rows + 2 : row, column: side === 6 ? 1 : side === 2 ? this.cols + 2 : column };
   }
-  connections(index) { return this.ports[index].map(port => (port + this.turns[index]) % 4); }
-  rotate(index) { this.turns[index] = (this.turns[index] + 1) % 4; this.moves++; }
+  connections(index) { return this.ports[index].map(port => (port + this.turns[index]) % 8); }
+  rotate(index, direction = 1) { this.turns[index] = (this.turns[index] + (direction < 0 ? 7 : 1)) % 8; this.moves++; }
+  // A new random position for every tile (used when a level restarts).
+  scramble(seed) { this.moves = 0; this.shuffle(randomGenerator(seed), 0); }
+  neighbour(index, port) {
+    const x = index % this.cols + STEP[port][0], y = Math.floor(index / this.cols) + STEP[port][1];
+    return x < 0 || y < 0 || x >= this.cols || y >= this.rows ? -1 : y * this.cols + x;
+  }
   powered() {
     const seen = new Set();
     if (!this.connections(this.input.index).includes(this.input.side)) return seen;
     const queue = [this.input.index]; seen.add(this.input.index);
-    const deltas = [-3, 1, 3, -1];
     for (let i = 0; i < queue.length; i++) {
       const at = queue[i];
       for (const port of this.connections(at)) {
-        const x = at % 3, y = Math.floor(at / 3);
-        if ((port === 0 && y === 0) || (port === 1 && x === 2) || (port === 2 && y === 2) || (port === 3 && x === 0)) continue;
-        const next = at + deltas[port];
-        if (this.connections(next).includes((port + 2) % 4) && !seen.has(next)) { seen.add(next); queue.push(next); }
+        const next = this.neighbour(at, port);
+        if (next >= 0 && !seen.has(next) && this.connections(next).includes((port + 4) % 8)) { seen.add(next); queue.push(next); }
       }
     }
     return seen;
@@ -359,7 +449,7 @@ export class Mission {
     if (near.type === 'relay' || near.type === 'rover') {
       if (near.type === 'rover' && !s.relayOnline) { this.notify('Restore the surface relay first. Echo needs the diagnostic uplink.', 'warning'); return; }
       s.status = 'repair'; this.route = null; this.repairType = near.type;
-      this.circuit = new Circuit(this.config.seed + (near.type === 'relay' ? 11 : 37), near.type);
+      this.circuit = new Circuit(this.config.seed + (near.type === 'relay' ? 11 : 37), near.type, this.circuitDifficulty(near.type));
       this.events.push({ type: 'repair' });
     } else if (near.type === 'board') {
       s.rover.occupied = true; s.player.x = s.rover.x; s.player.y = s.rover.y;
@@ -395,6 +485,16 @@ export class Mission {
     this.circuit = null; this.events.push({ type: 'repaired' }); return true;
   }
   cancelRepair() { if (this.state.status === 'repair') { this.state.status = 'playing'; this.circuit = null; } }
+  // Suit oxygen spent while working a repair in overtime. Running out ends the mission like any other oxygen loss.
+  spendOxygen(minutes, reason = 'repair overtime') {
+    const s = this.state; if (!(minutes > 0) || ['failed', 'complete'].includes(s.status)) return s.oxygen;
+    s.oxygen = Math.max(0, s.oxygen - minutes);
+    if (s.oxygen <= 0) {
+      s.status = 'failed'; s.failureReason = 'Oxygen reserve exhausted during ' + reason; this.circuit = null; this.route = null;
+      this.record('abort', s.failureReason); this.events.push({ type: 'ended' });
+    }
+    return s.oxygen;
+  }
   scan(site) {
     if (this.state.status !== 'playing' || this.state.suitWh < this.config.suit.scanWh) return;
     if (this.state.scans.includes(site.id)) return;
@@ -409,6 +509,10 @@ export class Mission {
     if (near?.type === 'scan') this.scan(near.point);
     else this.notify('Look for the cyan survey markers. Get close, then press Q to record an observation.');
   }
+  // How hard the circuit puzzle is (see circuitSettings). Training and expeditions raise it level by level.
+  circuitDifficulty(type) { return type === 'rover' ? 2 : 1; }
+  // Back to the start of the current level (used when the repair clock runs out after both extensions).
+  restartLevel() { this.reset(); return true; }
   replayCheckpoint() {
     if (!this.checkpoint) return;
     this.state = copy(this.checkpoint); this.state.status = 'playing'; this.events = []; this.route = null; this.circuit = null;
