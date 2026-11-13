@@ -9,6 +9,9 @@ let html=read('index.html').replace(/<link rel="stylesheet" href="styles\.css(?:
 // A callback preserves literal $& / $` / $' sequences in minified JavaScript.
 // String replacement interprets them as match substitutions and corrupts code.
 html=html.replace(/<script src="game\.js(?:\?[^\"]*)?" defer><\/script>/,()=>'<script>window.LUNA_DATA='+JSON.stringify(pack).replace(/</g,'\\u003c')+';</script>\n<script>'+escaped(read('game.js'))+'</script>');
+<<<<<<< HEAD
 html=html.replace('<script>window.LUNA_DATA=',()=>'<script>window.LUNA_DONKI='+read('data/donki_archive.json')+';window.LUNA_DATA=');
+=======
+>>>>>>> origin/main
 const destination=path.join(dist,'luna-playable.html');fs.writeFileSync(destination,html);
 console.log(JSON.stringify({file:destination,bytes:Buffer.byteLength(html),offline:true,renderer:'WebGL 2',embeddedData:true}));

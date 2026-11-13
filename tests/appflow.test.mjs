@@ -6,7 +6,10 @@ import { Mission, clamp } from '../dist/engine.js';
 import { TrainingMission } from '../dist/academy.js';
 import { AcademyGuide } from '../dist/academy-guide.js';
 import { Soundtrack } from '../dist/audio.js';
+<<<<<<< HEAD
 import { MissionAudio } from '../dist/mission-audio.js';
+=======
+>>>>>>> origin/main
 import { readPreference, writePreference } from '../dist/preferences.js';
 import { MovablePanel } from '../dist/panels.js';
 import { resolveRouteRequest, planSurfaceRoute } from '../dist/navigation.js';
@@ -16,9 +19,12 @@ import { AstronomicalWorld } from '../dist/astronomy-world.js';
 import { powerBalance } from '../dist/expedition.js';
 import { createDestinationMission } from '../dist/worlds.js';
 import { loadGameData, connectLocalBackend } from '../dist/local-backend.js';
+<<<<<<< HEAD
 import { PuzzleTimer, puzzleTimeLimit } from '../dist/puzzle-timer.js';
 import { buildRecapQuiz, scoreRecap } from '../dist/recap-quiz.js';
 import { chooseWeather, stageWeather } from '../dist/weather.js';
+=======
+>>>>>>> origin/main
 
 // A minimal interface test double: verifies controller wiring, not browser layout or playback.
 class Element {
@@ -51,7 +57,10 @@ class Element {
 class RenderDouble {
   constructor(canvas,mission) { this.mission=mission;if(mission?.astroWorld){this.rocks=[];this.surveys=[];this.pathGroups={};this.ground={visible:true};this.scenery={visible:true};this.player={visible:true};this.camera={fov:72,updateProjectionMatrix(){}};this.surfaceSky={telescope:null,magnification:1,update:()=>{const v=mission.astroWorld.sky(mission.config.world,mission.astroWorld.observerOverride||mission.terrain.geo(mission.state.player));this.surfaceSky.lastView=v;return v.bodies;},get hour(){return mission.astroWorld.utc%86400/3600;},setMagnification(){},aim(){return true;}};}this.zoom = 1.25; this.follow = true; this.mode = 'surface'; this.perspective='third-person';this.elevation = false; this.showLifeline = true; this.effects = [];this.yaw=Math.PI/4;this.pitch=.65;this.lookYaw=this.yaw+Math.PI;this.lookPitch=0; }
   dispose(){}
+<<<<<<< HEAD
   cinematicFrame(time,shot){(this.cinematicShots||=[]).push(shot);}
+=======
+>>>>>>> origin/main
   trigger(...args) { this.effects.push(args); } clearEffects() { this.effects = []; } resize() {} drawMini() {} draw() {}
   setElevation(value) { this.elevation = value; }
   rotateCamera(yaw,pitch=0){if(this.perspective==='first-person'){this.lookYaw+=yaw;this.lookPitch+=pitch;}else{this.yaw+=yaw;this.pitch+=pitch;}}
@@ -65,7 +74,11 @@ class RenderDouble {
   demonstrateTraining(){this.demonstration={active:true};}
 }
 const html = fs.readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
+<<<<<<< HEAD
 const app = fs.readFileSync(new URL('../dist/app.js', import.meta.url), 'utf8').replace(/^import .+;\r?\n/gm, '').replace(/boot\(\);\s*$/, 'globalThis.bootPromise = boot();');
+=======
+const app = fs.readFileSync(new URL('../dist/app.js', import.meta.url), 'utf8').replace(/^import .+;\n/gm, '').replace(/boot\(\);\s*$/, 'globalThis.bootPromise = boot();');
+>>>>>>> origin/main
 const data = Object.fromEntries(['terrain', 'mission', 'ephemerides','academy','terrain-mars','solar-system'].map(n => [n === 'mission' ? 'config' : n==='terrain-mars'?'marsTerrain':n==='solar-system'?'solar':n, JSON.parse(fs.readFileSync(new URL('../dist/data/' + n + '.json', import.meta.url)))]));
 async function interfaceContext(storage,{skipStory=true,skipFlight=true,scientific=false}={}) {
   const nodes = new Map([...html.matchAll(/<([a-z][\w-]*)\b([^>]*\bid="([^"]+)"[^>]*)>/g)].map(m => {
@@ -93,7 +106,11 @@ async function interfaceContext(storage,{skipStory=true,skipFlight=true,scientif
   for(const e of nodes.values())e.ownerDocument=document;
   const windowEvents = new Element();
   const shared=scientific?{...data,tranquillitatis:JSON.parse(fs.readFileSync(new URL('../dist/data/terrain-tranquillitatis.json',import.meta.url))),astronomy:JSON.parse(fs.readFileSync(new URL('../dist/data/astronomy.json',import.meta.url))),stars:JSON.parse(fs.readFileSync(new URL('../dist/data/stars.json',import.meta.url))),scenarios:JSON.parse(fs.readFileSync(new URL('../dist/data/scenarios.json',import.meta.url)))}:data;
+<<<<<<< HEAD
   const ctx = { document, loadGameData, connectLocalBackend, AstronomicalWorld,powerBalance,PuzzleTimer,puzzleTimeLimit,buildRecapQuiz,scoreRecap,chooseWeather,stageWeather,FlightSimulation,WORLDS,localSky,createDestinationMission,FlightRenderer:class{constructor(r,f,d){this.r=r;this.sim=f;this.data=d;this.rotations=[];this.hits=0;}draw(){}dispose(){}rotate(yaw,pitch){this.rotations.push({yaw,pitch});}hitButton(){this.hits++;return true;}drawSolarSystem(){}rotateSolar(){}}, Mission, TrainingMission, clamp, AcademyGuide, Soundtrack, MissionAudio, StorySequence, MovablePanel, resolveRouteRequest, planSurfaceRoute, readPreference, writePreference, Renderer: RenderDouble,
+=======
+  const ctx = { document, loadGameData, connectLocalBackend, AstronomicalWorld,powerBalance,FlightSimulation,WORLDS,localSky,createDestinationMission,FlightRenderer:class{constructor(r,f,d){this.r=r;this.sim=f;this.data=d;this.rotations=[];this.hits=0;}draw(){}dispose(){}rotate(yaw,pitch){this.rotations.push({yaw,pitch});}hitButton(){this.hits++;return true;}drawSolarSystem(){}rotateSolar(){}}, Mission, TrainingMission, clamp, AcademyGuide, Soundtrack, StorySequence, MovablePanel, resolveRouteRequest, planSurfaceRoute, readPreference, writePreference, Renderer: RenderDouble,
+>>>>>>> origin/main
     LUNA_DATA: shared, localStorage: storage, devicePixelRatio: 1, innerWidth:1440, innerHeight:900, matchMedia: () => ({ matches: false }), addEventListener:(...args)=>windowEvents.addEventListener(...args), fire:(...args)=>windowEvents.fire(...args),
     ResizeObserver: class { observe() {} }, console, setTimeout: () => 1, clearTimeout() {}, requestAnimationFrame(fn) { ctx.frame = fn; }
   };
@@ -112,7 +129,11 @@ test('academy controller restores guidance, keeps Settings reversible, and unloc
   nodes.get('settings-button').fire('click'); assert.equal(nodes.get('settings-dialog').open,true); assert.equal(m.state.status,'paused');
   for(let i=0;i<60;i++)ctx.frame(++frame*1000/60);
   assert.deepEqual([m.state.time,m.state.distanceMetres,m.state.oxygen],progress);
+<<<<<<< HEAD
   nodes.get('music-toggle').fire('click'); assert.equal(ctx.luna.audio.settings.musicOn,false);assert.equal(ctx.luna.audio.settings.effectsOn,true);
+=======
+  nodes.get('music-toggle').fire('click'); assert.equal(ctx.luna.audio.muted,true);
+>>>>>>> origin/main
   nodes.get('tutorial-setting-toggle').fire('click'); assert.equal(guide.active,false);
   nodes.get('tutorial-restart').fire('click'); assert.equal(nodes.get('settings-dialog').open,false);assert.equal(guide.active,true);assert.equal(m.state.status,'playing');
   assert.deepEqual([m.state.time,m.state.distanceMetres,m.state.oxygen],progress);
@@ -200,9 +221,14 @@ test('opening ignores the legacy seen flag, runs once per visit and does not rep
  assert.equal(document.body.classes.has('in-story'),true);
  for(const id of ['game-header','mission-panel','game-footer','astra-button','astra-card']){assert.equal(nodes.get(id).hidden,true,id+' is absent during the opening');assert.equal(nodes.get(id).inert,true,id+' cannot accept opening input');}
  const reserves=[m.state.oxygen,m.state.water,m.state.suitWh];for(let i=0;i<60;i++)ctx.frame(i*1000/60);
+<<<<<<< HEAD
  assert.ok(ctx.luna.renderer.cinematicShots?.length>=50,'the 3D opening cinematic is drawn every story frame');
  assert.equal(m.state.time,0);assert.deepEqual([m.state.oxygen,m.state.water,m.state.suitWh],reserves);
  for(let i=60;i<650;i++)ctx.frame(1000+i*100);
+=======
+ assert.equal(m.state.time,0);assert.deepEqual([m.state.oxygen,m.state.water,m.state.suitWh],reserves);
+ for(let i=60;i<350;i++)ctx.frame(1000+i*100);
+>>>>>>> origin/main
  assert.equal(nodes.get('story-dialog').open,false);assert.equal(nodes.get('tutorial-card').hidden,false);assert.equal(ctx.luna.story.state,'finished');
  assert.equal(document.body.classes.has('in-story'),false);
  for(const id of ['game-header','mission-panel','game-footer','astra-button']){assert.equal(nodes.get(id).hidden,false,id+' returns after narration');assert.equal(nodes.get(id).inert,false);}
@@ -323,7 +349,11 @@ test('scientific controller connects outpost decisions, clock exploration, catal
  assert.equal(m.isExpedition,true);assert.equal(nodes.get('solar-explorer').parentElement,playfield);assert.equal(nodes.get('solar-body').children.length,26);assert.equal(nodes.get('outpost-resources').children.length,12);
  const beforePanel=JSON.stringify(m.state);nodes.get('panel-systems').fire('click');assert.equal(nodes.get('mission-panel').classes.has('show-systems'),true);assert.equal(nodes.get('panel-systems').getAttribute('aria-pressed'),'true');nodes.get('panel-mission').fire('click');assert.equal(nodes.get('mission-panel').classes.has('show-systems'),false);assert.equal(JSON.stringify(m.state),beforePanel,'compact panel navigation keeps mission progress');
  nodes.get('next-action-button').fire('click');assert.equal(m.state.status,'playing');travel(m,m.target());m.interact();ctx.processEvents();assert.equal(nodes.get('repair-dialog').open,true);solve(m);nodes.get('apply-repair').fire('click');assert.equal(nodes.get('decision-dialog').open,true);assert.equal(nodes.get('decision-options').children.length,3);
+<<<<<<< HEAD
  nodes.get('decision-options').children[0].children.at(-1).fire('click');assert.equal(m.state.expedition.stage,0,'preview is not a commit');nodes.get('decision-confirm').fire('click');nodes.get('consequence-next').fire('click');assert.equal(m.state.expedition.stage,1);assert.equal(nodes.get('decision-dialog').open,false);assert.equal(m.state.status,'playing');
+=======
+ nodes.get('decision-options').children[0].children.at(-1).fire('click');assert.equal(m.state.expedition.stage,1);assert.equal(nodes.get('decision-dialog').open,false);assert.equal(m.state.status,'playing');
+>>>>>>> origin/main
  const state=JSON.stringify(m.state),utc=a.utc;nodes.get('sky-button').fire('click');assert.equal(a.mode,'exploration');nodes.get('astronomy-utc').value='2027-01-01T12:00';nodes.get('astronomy-utc').fire('change');assert.equal(new Date(a.utc*1000).toISOString(),'2027-01-01T12:00:00.000Z');assert.equal(JSON.stringify(m.state),state);assert.equal(nodes.get('sky-body-list').children.length,25);nodes.get('sky-close').fire('click');assert.equal(a.utc,utc);assert.equal(a.mode,'mission');
  nodes.get('save-checkpoint').fire('click');assert.ok(values.has('luna-expedition-v2-moon'));nodes.get('journey-button').fire('click');assert.equal(ctx.luna.flight.phase,'briefing');assert.equal(nodes.get('continue-surface').hidden,false);nodes.get('continue-surface').fire('click');assert.equal(ctx.luna.mission.state.expedition.stage,1);assert.equal(ctx.luna.mission.state.status,'playing');
 });

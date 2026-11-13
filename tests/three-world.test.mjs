@@ -57,7 +57,11 @@ test('story is a one-way timeline per visit, pauses when backgrounded, and persi
   assert.equal(new StorySequence(storage).shouldPlay,true);assert.equal(map.has(STORY_KEY),false);
   s.setEnabled(false);assert.equal(new StorySequence(storage).shouldPlay,false);s.setEnabled(true);assert.equal(new StorySequence(storage).shouldPlay,true);assert.equal(s.start(),false);
   const t=new StorySequence({getItem:()=>null,setItem:()=>{throw Error('blocked');}});assert.equal(t.start(),true);t.finish(true);assert.equal(t.state,'skipped');assert.equal(t.start(),false);
+<<<<<<< HEAD
   const html=fs.readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');assert.doesNotMatch(html,/<video\b|id="story-play"/);assert.match(html,/id="story-replay"/);
+=======
+  const html=fs.readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');assert.doesNotMatch(html,/<video\b|id="story-play"|id="story-replay"/);
+>>>>>>> origin/main
 });
 test('camera makes a full 360 degree orbit, changes elevation and retains the equipment inspection target',()=>{
   const m=new TrainingMission(data('terrain'),data('mission'),data('ephemerides'),data('academy'));

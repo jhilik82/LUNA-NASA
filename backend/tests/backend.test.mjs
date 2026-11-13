@@ -48,6 +48,23 @@ test('API refuses foreign origins, non-JSON writes and non-LUNA save keys', asyn
   assert.equal((await fetch(base + '/backend/data/state.json')).status, 404);
 });
 
+<<<<<<< HEAD
+=======
+test('static serving refuses symlinks that escape the served project tree', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'luna-static-'));
+  const secret = path.join(directory, 'private.txt');
+  const link = path.join(PROJECT_ROOT, 'workspace', '.test-escape-' + randomUUID());
+  await fs.writeFile(secret, 'must not be served');
+  await fs.symlink(secret, link);
+  t.after(async () => { await fs.rm(link, { force: true }); await fs.rm(directory, { recursive: true, force: true }); });
+  const { server } = await createLunaServer({ dataDirectory: path.join(directory, 'store') });
+  const base = await listen(server);
+  t.after(() => stop(server));
+  assert.equal((await fetch(base + '/workspace/' + path.basename(link))).status, 403);
+  assert.equal((await fetch(base + '/workspace')).status, 200);
+});
+
+>>>>>>> origin/main
 test('validation publishes an immutable version, retains old objects and rejects invalid packs', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'luna-packs-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
