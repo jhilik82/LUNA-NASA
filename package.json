@@ -1,6 +1,6 @@
 {
   "name": "luna-beyond-the-lifeline",
-  "version": "1.3.1-merged",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "LUNA + ASTRA: Moon and Mars outpost missions, connected flight, shared JPL astronomy and grounded resource guidance.",
@@ -16,7 +16,8 @@
     "data:refresh": "node tools/run-data-job.mjs --refresh",
     "data:test": "node tools/run-data-job.mjs --test",
     "cloud:publish": "node backend/publish-cloud.mjs",
-    "data:watch": "node tools/schedule-data.mjs"
+    "data:watch": "node tools/schedule-data.mjs",
+    "multiplayer": "node tools/serve.mjs --multiplayer"
   },
   "dependencies": {
     "three": "0.180.0"
