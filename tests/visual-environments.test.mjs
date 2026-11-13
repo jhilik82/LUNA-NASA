@@ -85,7 +85,6 @@ test('Earth launch sky, direct sunlight and gantry lamps follow the dated Sun fo
   // hard-coded property of Mars selection.
   a.setMissionUTC(f.departureUTC+12*3600);v.draw();assert.ok(v.sharedSky.lastView.sun.altitude>0);assert.ok(v.sky.material.uniforms.day.value>.9);assert.ok(v.sun.intensity>0);v.dispose();r.dispose();
 });
-<<<<<<< HEAD
 
 test('mid-cruise: the ship is lit in deep space, the cruise backdrop shows, and the bus hardware animates fault then repair',()=>{
   const {f,v}=scene('moon');f.enter('transfer');f.elapsed=12;f.routeProgress=.5;v.draw();
@@ -98,5 +97,3 @@ test('mid-cruise: the ship is lit in deep space, the cruise backdrop shows, and 
   for(const l of v.busLights.filter(l=>l.userData.circuit==='main'))assert.equal(l.material.emissive.getHexString(),'45d483','main bus restored to green');
   f.enter('boarding');f.elapsed=1;v.draw();assert.equal(v.cruise.visible,false);assert.ok(v.scene.fog,'launch-site haze returns on the pad');
 });
-=======
->>>>>>> origin/main
